@@ -1,47 +1,40 @@
 # VibeSync Kids Drawing Toddler Paint
 
-A small Flutter drawing app for toddlers. The Android application lives in `lib/` and `android/`; `src/` is a separate React/Vite developer dashboard and source-code generator.
+Flutter drawing and sticker app for young children. Android app code is under \`lib/\` and \`android/\`; \`src/\` is a separate React/Vite developer dashboard and source generator.
 
-## Current app features
+## Implemented in this branch
 
-- Freehand finger drawing on a canvas.
-- Six selectable brush colors and a clear-canvas action.
-- Bottom banner ad integration with a visual spacer separating the ad area from the canvas.
-- A randomized arithmetic parental gate before a rewarded-ad bonus-unlock attempt.
-- Child-directed AdMob request configuration, a G-rated content ceiling, under-age-of-consent flag and a non-personalized-ad request extra.
+- Isolated canvas painter/controller with a repaint boundary.
+- Immutable strokes preserving original color, width and brush style.
+- Solid, neon and rainbow brush styles.
+- Vector sticker stamps for puppy, sunshine, rocket, unicorn, house, flower, pond and fish.
+- Undo/redo for strokes, stamps, background changes and clear operations.
+- Debounced local-only drawing auto-save and best-effort restore.
+- Six-language initial UI localization (English, Spanish, Hindi, Chinese, German and French).
+- Network availability notice while keeping the canvas usable offline.
+- Android Play in-app update check with graceful fallback when the Play API is unavailable.
+- Parent arithmetic gate before opening an optional support URL.
 
-## Important current limitations
+## Current limitations
 
-- The four bonus entries are currently labels and unlock states, not finished coloring-page illustrations.
-- Brush color is currently applied by the painter to all stored strokes, so changing color can recolor previous strokes. Per-stroke color storage is still needed.
-- Drawings are held in memory only. Save/export, undo/redo, persistence and sharing are not implemented.
-- A wrong answer in the Flutter parental gate closes the dialog instead of offering another attempt.
-- The banner uses the configured app's banner ad unit. Rewarded and interstitial IDs in `lib/ad_helper.dart` are Google's test IDs; the interstitial helper is not currently called by the Flutter UI.
-- The ad settings are technical safeguards, not a certification or guarantee of COPPA, GDPR-K or Google Play Families Policy compliance. Verify the app's audience, consent/privacy disclosures, ad-network setup and ad placement in Play Console and AdMob before release.
-
-## Repository map
-
-| Path | Purpose |
-| --- | --- |
-| `lib/main.dart` | Flutter drawing screen and parental gate |
-| `lib/ad_helper.dart` | AdMob initialization, request flags and ad lifecycle helpers |
-| `android/` | Android manifest, launcher resources and release configuration |
-| `test/admob_coppa_test.dart` | Flutter unit tests for selected ad/request invariants |
-| `src/` | React/Vite developer dashboard, simulator and generated Flutter templates |
-| `.github/workflows/build-aab.yml` | Android App Bundle/APK build workflow |
-
-The web dashboard contains simulated ad playback and illustrative test-status UI. It does not execute Flutter tests or inspect a built APK.
+- The paint bucket is deliberately disabled until a real raster-backed, bounded flood-fill engine and its undo/redo tests are implemented.
+- Raster checkpointing and offscreen image-cache compaction are not yet implemented; vectors remain the document source of truth.
+- Coloring-page stencils are lightweight guides, not a paint-inside-the-lines system.
+- Auto-saved drawings are stored only on-device by this app code and are not uploaded to a developer server.
+- Coffee support requires a verified HTTPS page provided as \`--dart-define=VIBESYNC_SUPPORT_URL=https://your-real-support-page\`. No payment URL is guessed.
+- Rewarded/interstitial ad IDs are still Google test IDs in \`lib/ad_helper.dart\`; set up production units and verify child-directed ad/network policy before release.
+- Technical safeguards do not certify compliance with COPPA, GDPR-K or Google Play Families Policy.
 
 ## Build and test
 
-Use a Flutter stable SDK and Java 17.
+Use Flutter stable and Java 17.
 
-```sh
+\`\`\`sh
 flutter pub get
 dart run flutter_launcher_icons
 flutter test
 flutter analyze
-flutter build appbundle --release
-```
+flutter build appbundle --release --dart-define=VIBESYNC_SUPPORT_URL=https://your-verified-support-page
+\`\`\`
 
-The GitHub Actions workflow builds a release AAB and APK and uploads them as workflow artifacts. Release signing must use the intended upload keystore; do not publish an artifact that was signed with the debug key.
+GitHub Actions builds an AAB and APK, runs tests and static analysis, and uploads artifacts. Verify release signing, install on real devices, and test Play Store in-app updates through a Play testing track before publishing.

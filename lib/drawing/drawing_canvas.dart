@@ -10,71 +10,89 @@ class DrawingCanvas extends StatelessWidget {
   const DrawingCanvas({
     required this.controller,
     required this.onDrawingStateChanged,
+    this.guideTemplate,
     super.key,
   });
 
   final DrawingController controller;
   final ValueChanged<bool> onDrawingStateChanged;
+  final StampKind? guideTemplate;
 
   @override
-  Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: ClipRect(
-        child: Listener(
-          behavior: HitTestBehavior.opaque,
-          onPointerDown: (event) {
-            if (controller.activeTool == ActiveTool.stamp) {
-              controller.placeSelectedStamp(event.localPosition);
-              return;
-            }
-            if (controller.activeTool == ActiveTool.paintBucket) return;
-            controller.beginStroke(event.localPosition);
-            onDrawingStateChanged(controller.isDrawing);
-          },
-          onPointerMove: (event) {
-            if (controller.isDrawing) controller.extendStroke(event.localPosition);
-          },
-          onPointerUp: (_) {
-            controller.endStroke();
-            onDrawingStateChanged(false);
-          },
-          onPointerCancel: (_) {
-            controller.cancelStroke(keepPartialStroke: true);
-            onDrawingStateChanged(false);
-          },
-          child: CustomPaint(painter: _DrawingPainter(controller), size: Size.infinite),
+  Widget build(BuildContext context) => RepaintBoundary(
+        child: ClipRect(
+          child: Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: (event) {
+              if (controller.activeTool == ActiveTool.stamp) {
+                controller.placeSelectedStamp(event.localPosition);
+                return;
+              }
+              if (controller.activeTool == ActiveTool.paintBucket) return;
+              controller.beginStroke(event.localPosition);
+              onDrawingStateChanged(controller.isDrawing);
+            },
+            onPointerMove: (event) {
+              if (controller.isDrawing) controller.extendStroke(event.localPosition);
+            },
+            onPointerUp: (_) {
+              controller.endStroke();
+              onDrawingStateChanged(false);
+            },
+            onPointerCancel: (_) {
+              controller.cancelStroke(keepPartialStroke: true);
+              onDrawingStateChanged(false);
+            },
+            child: CustomPaint(
+              painter: _DrawingPainter(controller, guideTemplate),
+              size: Size.infinite,
+            ),
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 class _DrawingPainter extends CustomPainter {
-  _DrawingPainter(this.controller) : super(repaint: controller);
+  _DrawingPainter(this.controller, this.guideTemplate) : super(repaint: controller);
   final DrawingController controller;
+  final StampKind? guideTemplate;
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
     canvas.clipRect(Offset.zero & size);
     canvas.drawColor(controller.backgroundColor, BlendMode.src);
+
+    final guide = guideTemplate;
+    if (guide != null && size.width > 0 && size.height > 0) {
+      _paintStamp(canvas, CanvasStamp(
+        id: 'template-guide',
+        kind: guide,
+        position: Offset(size.width / 2, size.height / 2),
+        scale: (math.min(size.width, size.height) * 0.0034).clamp(0.7, 1.7).toDouble(),
+        rotationAngle: 0,
+        fillColor: Colors.transparent,
+        strokeColor: const Color(0xFFB8C3D1),
+        layerCategory: guide.defaultLayer,
+        order: -1,
+      ));
+    }
+
     for (final stamp in sortStampsByLayer(controller.stamps)) {
       _paintStamp(canvas, stamp);
     }
     for (final stroke in controller.strokes) {
       _paintStroke(canvas, stroke);
     }
+
     final points = controller.activePoints;
     if (points.isNotEmpty && controller.isDrawing) {
-      _paintStroke(
-        canvas,
-        AdvancedStroke(
-          points: List<Offset>.from(points),
-          style: controller.brushStyle,
-          color: controller.brushColor,
-          width: controller.brushWidth,
-        ),
-      );
+      _paintStroke(canvas, AdvancedStroke(
+        points: List<Offset>.from(points),
+        style: controller.brushStyle,
+        color: controller.brushColor,
+        width: controller.brushWidth,
+      ));
     }
     canvas.restore();
   }
@@ -95,6 +113,7 @@ class _DrawingPainter extends CustomPainter {
       }
       return;
     }
+
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke.width
@@ -117,7 +136,9 @@ class _DrawingPainter extends CustomPainter {
           ..color = stroke.color.withOpacity(0.45)
           ..maskFilter = MaskFilter.blur(BlurStyle.normal, stroke.width * 0.75);
         canvas.drawPath(path, glow);
-        paint..color = Colors.white..strokeWidth = math.max(1.0, stroke.width * 0.42).toDouble();
+        paint
+          ..color = Colors.white
+          ..strokeWidth = math.max(1.0, stroke.width * 0.42).toDouble();
         canvas.drawPath(path, paint);
         break;
       case StrokeStyle.rainbow:
@@ -126,7 +147,8 @@ class _DrawingPainter extends CustomPainter {
           paint.color = stroke.color;
         } else {
           paint.shader = ui.Gradient.linear(
-            bounds.topLeft, bounds.bottomRight,
+            bounds.topLeft,
+            bounds.bottomRight,
             const [
               Color(0xFFFF3B30), Color(0xFFFF9500), Color(0xFFFFCC00),
               Color(0xFF34C759), Color(0xFF00C7BE), Color(0xFF007AFF),
@@ -145,7 +167,10 @@ class _DrawingPainter extends CustomPainter {
     canvas.translate(stamp.position.dx, stamp.position.dy);
     canvas.rotate(stamp.rotationAngle);
     canvas.scale(stamp.scale);
-    final fill = Paint()..color = stamp.fillColor..style = PaintingStyle.fill..isAntiAlias = true;
+    final fill = Paint()
+      ..color = stamp.fillColor
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
     final outline = Paint()
       ..color = stamp.strokeColor
       ..style = PaintingStyle.stroke
@@ -166,9 +191,9 @@ class _DrawingPainter extends CustomPainter {
         canvas.drawOval(const Rect.fromLTWH(-42, -40, 84, 80), outline);
         canvas.drawOval(const Rect.fromLTWH(-52, -35, 23, 42), fill);
         canvas.drawOval(const Rect.fromLTWH(29, -35, 23, 42), fill);
-        canvas.drawCircle(const Offset(-15, -10), 3.5, Paint()..color = Colors.black);
-        canvas.drawCircle(const Offset(15, -10), 3.5, Paint()..color = Colors.black);
-        canvas.drawOval(const Rect.fromLTWH(-8, 0, 16, 10), Paint()..color = Colors.brown);
+        canvas.drawCircle(const Offset(-15, -10), 3.5, Paint()..color = stamp.strokeColor);
+        canvas.drawCircle(const Offset(15, -10), 3.5, Paint()..color = stamp.strokeColor);
+        canvas.drawOval(const Rect.fromLTWH(-8, 0, 16, 10), Paint()..color = stamp.strokeColor);
         canvas.drawArc(const Rect.fromLTWH(-16, 0, 32, 18), 0.2, 2.7, false, outline);
         break;
       case StampKind.sunshine:
@@ -179,8 +204,8 @@ class _DrawingPainter extends CustomPainter {
           canvas.drawLine(Offset(math.cos(a) * 35, math.sin(a) * 35),
               Offset(math.cos(a) * 45, math.sin(a) * 45), outline);
         }
-        canvas.drawCircle(const Offset(-9, -5), 3, Paint()..color = Colors.black);
-        canvas.drawCircle(const Offset(9, -5), 3, Paint()..color = Colors.black);
+        canvas.drawCircle(const Offset(-9, -5), 3, Paint()..color = stamp.strokeColor);
+        canvas.drawCircle(const Offset(9, -5), 3, Paint()..color = stamp.strokeColor);
         canvas.drawArc(const Rect.fromLTWH(-11, -1, 22, 15), 0.2, 2.7, false, outline);
         break;
       case StampKind.rocket:
@@ -190,14 +215,14 @@ class _DrawingPainter extends CustomPainter {
         canvas.drawPath(poly([const Offset(22, 15), const Offset(40, 36), const Offset(17, 30)]), fill);
         canvas.drawPath(poly([const Offset(-14, -33), const Offset(0, -50), const Offset(14, -33)]), fill);
         canvas.drawCircle(const Offset(0, -12), 8, outline);
-        canvas.drawPath(poly([const Offset(-9, 35), const Offset(0, 47), const Offset(9, 35)]), Paint()..color = Colors.orange);
+        canvas.drawPath(poly([const Offset(-9, 35), const Offset(0, 47), const Offset(9, 35)]), Paint()..color = stamp.strokeColor);
         break;
       case StampKind.unicorn:
         canvas.drawOval(const Rect.fromLTWH(-39, -30, 76, 63), fill);
         canvas.drawOval(const Rect.fromLTWH(-39, -30, 76, 63), outline);
-        canvas.drawPath(poly([const Offset(-7, -28), const Offset(2, -52), const Offset(12, -27)]), Paint()..color = Colors.amber);
+        canvas.drawPath(poly([const Offset(-7, -28), const Offset(2, -52), const Offset(12, -27)]), outline);
         canvas.drawPath(poly([const Offset(-30, -27), const Offset(-44, -44), const Offset(-16, -36)]), fill);
-        canvas.drawCircle(const Offset(-14, -6), 3, Paint()..color = Colors.black);
+        canvas.drawCircle(const Offset(-14, -6), 3, Paint()..color = stamp.strokeColor);
         canvas.drawArc(const Rect.fromLTWH(-15, 0, 24, 18), 0.1, 2.8, false, outline);
         break;
       case StampKind.house:
@@ -217,9 +242,9 @@ class _DrawingPainter extends CustomPainter {
           canvas.drawCircle(center, 13, fill);
           canvas.drawCircle(center, 13, outline);
         }
-        canvas.drawCircle(Offset.zero, 12, Paint()..color = Colors.amber);
+        canvas.drawCircle(Offset.zero, 12, outline);
         canvas.drawLine(const Offset(0, 27), const Offset(0, 46), outline);
-        canvas.drawOval(const Rect.fromLTWH(0, 32, 18, 8), Paint()..color = Colors.green);
+        canvas.drawOval(const Rect.fromLTWH(0, 32, 18, 8), outline);
         break;
       case StampKind.pond:
         const pondRect = Rect.fromLTRB(-46, -30, 46, 30);
@@ -235,7 +260,7 @@ class _DrawingPainter extends CustomPainter {
         final tail = poly([const Offset(20, 0), const Offset(42, -16), const Offset(42, 16)]);
         canvas.drawPath(tail, fill);
         canvas.drawPath(tail, outline);
-        canvas.drawCircle(const Offset(-14, -4), 3, Paint()..color = Colors.black);
+        canvas.drawCircle(const Offset(-14, -4), 3, Paint()..color = stamp.strokeColor);
         break;
     }
     canvas.restore();
@@ -243,5 +268,7 @@ class _DrawingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DrawingPainter old) =>
-      old.controller != controller || old.controller.revision != controller.revision;
+      old.controller != controller ||
+      old.controller.revision != controller.revision ||
+      old.guideTemplate != guideTemplate;
 }

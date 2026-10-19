@@ -1,32 +1,29 @@
 name: kids_drawing_toddler_paint
-description: "VibeSync Kids Drawing Toddler Paint with child-directed AdMob settings"
+description: "VibeSync Kids Drawing Toddler Paint"
 publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
-  flutter: ">=3.10.0"
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
 
 dependencies:
   flutter:
     sdk: flutter
-
-  # Google Mobile Ads official Flutter plugin
+  flutter_localizations:
+    sdk: flutter
   google_mobile_ads: ^5.2.0
+  connectivity_plus: ^6.1.5
+  in_app_update: ^4.2.5
+  shared_preferences: ^2.5.3
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-
-  # Automatic Launcher Icons Generator for Android & iOS
   flutter_launcher_icons: ^0.13.1
 
-# ==============================================================================
-# FLUTTER LAUNCHER ICONS CONFIGURATION
-# Generates mipmap-hdpi, xhdpi, xxhdpi, xxxhdpi, and Android 8.0+ adaptive icons
-# Run: dart run flutter_launcher_icons
-# ==============================================================================
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: false
@@ -37,6 +34,3 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
-  # Assets can be enabled when asset files are added to the directory:
-  # assets:
-  #   - assets/icon/
