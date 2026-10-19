@@ -1,7 +1,7 @@
 name: kids_drawing_toddler_paint
 description: "Child-Safe Kids Drawing Studio with AdMob COPPA & Families Policy"
 publish_to: "none"
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -37,6 +37,6 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
-  # Assets can be enabled when asset files are added to the directory:
+  # Assets can be enabled when assets files are added to the directory:
   # assets:
   #   - assets/icon/
