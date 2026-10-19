@@ -15,6 +15,7 @@ class DrawingController extends ChangeNotifier {
   DrawingController({this.persistenceEnabled = true});
 
   static const maxHistoryEntries = 100;
+  static const maxPointsPerStroke = 12000;
   static const maxRasterFillLayers = 24;
   static const maxRasterFillBytes = 8 * 1024 * 1024;
   static const maxTotalRasterBytes = 24 * 1024 * 1024;
@@ -149,6 +150,22 @@ class DrawingController extends ChangeNotifier {
   void extendStroke(Offset point) {
     if (!_isDrawing) return;
     if (_activePoints.isNotEmpty && (_activePoints.last - point).distance < 0.5) return;
+
+    // Bound a single live gesture's coordinate array. If a very long drawing
+    // reaches the cap, retain every other point plus the last point, preserving
+    // the broad path while avoiding unbounded pointer-sample growth.
+    if (_activePoints.length >= maxPointsPerStroke) {
+      final reduced = <Offset>[];
+      for (var i = 0; i < _activePoints.length; i += 2) {
+        reduced.add(_activePoints[i]);
+      }
+      if (reduced.isNotEmpty && reduced.last != _activePoints.last) {
+        reduced.add(_activePoints.last);
+      }
+      _activePoints
+        ..clear()
+        ..addAll(reduced);
+    }
     _activePoints.add(point);
     _notify(persist: false);
   }

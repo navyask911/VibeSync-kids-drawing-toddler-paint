@@ -12,6 +12,18 @@ void main() {
     setUp(() => controller = DrawingController(persistenceEnabled: false));
     tearDown(() => controller.dispose());
 
+    test('active point storage remains bounded for an unusually long gesture', () {
+      controller.beginStroke(const Offset(0, 0));
+      for (var i = 1; i <= DrawingController.maxPointsPerStroke + 50; i++) {
+        controller.extendStroke(Offset(i.toDouble(), (i % 17).toDouble()));
+      }
+      expect(controller.activePoints.length,
+          lessThanOrEqualTo(DrawingController.maxPointsPerStroke));
+      controller.endStroke();
+      expect(controller.strokes.single.points.length,
+          lessThanOrEqualTo(DrawingController.maxPointsPerStroke));
+    });
+
     test('each stroke preserves its original color and brush style', () {
       controller.selectBrushColor(Colors.red);
       controller.selectBrushStyle(StrokeStyle.neon);

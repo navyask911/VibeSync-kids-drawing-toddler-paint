@@ -8,7 +8,9 @@ Flutter drawing and sticker app for young children. Android app code is under \`
 - Immutable strokes preserving original color, width and brush style.
 - Solid, neon and rainbow brush styles.
 - Vector sticker stamps for puppy, sunshine, rocket, unicorn, house, flower, pond and fish.
-- Undo/redo for strokes, stamps, background changes and clear operations.
+- Undo/redo for strokes, stamps, background changes, raster fills and clear operations.
+- A cached recorded-picture layer so pointer movement redraws the active stroke instead of replaying all committed strokes every frame.
+- A per-gesture point cap with downsampling for very long continuous strokes.
 - Debounced local-only JSON file auto-save and best-effort restore (avoids placing the full drawing into a small preferences string).
 - Six-language initial UI localization (English, Spanish, Hindi, Chinese, German and French).
 - Network availability notice while keeping the canvas usable offline.
@@ -17,9 +19,9 @@ Flutter drawing and sticker app for young children. Android app code is under \`
 
 ## Current limitations
 
-- The paint bucket is deliberately disabled until a real raster-backed, bounded flood-fill engine and its undo/redo tests are implemented.
-- Raster checkpointing and offscreen image-cache compaction are not yet implemented; vectors remain the document source of truth.
-- Coloring-page stencils are lightweight guides, not a paint-inside-the-lines system.
+- The paint bucket uses a bounded, non-recursive isolate worker over a capped raster of the visible canvas. Each successful operation creates a transparent PNG fill layer that is undoable and saved locally; regions above 500,000 pixels are rejected safely.
+- Raster checkpoint compaction that discards/merges old vector history is not implemented. A recorded-picture cache improves repaint cost, while immutable vector strokes remain the authoritative history.
+- Coloring-page stencils are simple vector guides. Flood fill supports closed pixel regions, but more detailed, region-designed coloring-book artwork remains future work.
 - Auto-saved drawings are stored only on-device by this app code and are not uploaded to a developer server.
 - Coffee support requires a verified HTTPS page provided as \`--dart-define=VIBESYNC_SUPPORT_URL=https://your-real-support-page\`. No payment URL is guessed.
 - Rewarded/interstitial ad IDs are still Google test IDs in \`lib/ad_helper.dart\`; set up production units and verify child-directed ad/network policy before release.
