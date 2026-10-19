@@ -162,8 +162,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       final logicalPixels = logicalSize.width * logicalSize.height;
       final ratio = math.min(deviceRatio, math.sqrt(safePixelLimit / logicalPixels))
           .clamp(0.5, 3.0).toDouble();
-      final width = math.max(1, (logicalSize.width * ratio).round());
-      final height = math.max(1, (logicalSize.height * ratio).round());
+      final width = math.max(1, (logicalSize.width * ratio).round()).toInt();
+      final height = math.max(1, (logicalSize.height * ratio).round()).toInt();
       if (width > safePixelLimit ~/ height) {
         widget.onBucketResult('bucket_failed');
         return;
@@ -196,8 +196,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         sourceRgba: rawBytes,
         width: width,
         height: height,
-        seedX: (point.dx * ratio).floor().clamp(0, width - 1),
-        seedY: (point.dy * ratio).floor().clamp(0, height - 1),
+        seedX: (point.dx * ratio).floor().clamp(0, width - 1).toInt(),
+        seedY: (point.dy * ratio).floor().clamp(0, height - 1).toInt(),
         fillRgba: [
           (color >> 16) & 0xff,
           (color >> 8) & 0xff,
