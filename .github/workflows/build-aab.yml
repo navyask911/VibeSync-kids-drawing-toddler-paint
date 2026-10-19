@@ -102,3 +102,24 @@ jobs:
           path: |
             build/app/outputs/bundle/release/*.aab
             build/app/outputs/flutter-apk/*.apk
+
+  dashboard-check:
+    name: Type-check and build React/Vite dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install locked dashboard dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check dashboard
+        run: bun run lint
+
+      - name: Build dashboard
+        run: bun run build
