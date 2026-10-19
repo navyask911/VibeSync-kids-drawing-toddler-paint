@@ -5,6 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // GitHub Pages hosts this project under the repository-name subpath.
+    base: process.env.GITHUB_PAGES === 'true' ? '/VibeSync-kids-drawing-toddler-paint/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
