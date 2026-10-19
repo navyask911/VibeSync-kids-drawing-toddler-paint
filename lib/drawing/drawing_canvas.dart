@@ -1,0 +1,247 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
+
+import 'drawing_controller.dart';
+import 'drawing_models.dart';
+
+class DrawingCanvas extends StatelessWidget {
+  const DrawingCanvas({
+    required this.controller,
+    required this.onDrawingStateChanged,
+    super.key,
+  });
+
+  final DrawingController controller;
+  final ValueChanged<bool> onDrawingStateChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: ClipRect(
+        child: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: (event) {
+            if (controller.activeTool == ActiveTool.stamp) {
+              controller.placeSelectedStamp(event.localPosition);
+              return;
+            }
+            if (controller.activeTool == ActiveTool.paintBucket) return;
+            controller.beginStroke(event.localPosition);
+            onDrawingStateChanged(controller.isDrawing);
+          },
+          onPointerMove: (event) {
+            if (controller.isDrawing) controller.extendStroke(event.localPosition);
+          },
+          onPointerUp: (_) {
+            controller.endStroke();
+            onDrawingStateChanged(false);
+          },
+          onPointerCancel: (_) {
+            controller.cancelStroke(keepPartialStroke: true);
+            onDrawingStateChanged(false);
+          },
+          child: CustomPaint(painter: _DrawingPainter(controller), size: Size.infinite),
+        ),
+      ),
+    );
+  }
+}
+
+class _DrawingPainter extends CustomPainter {
+  _DrawingPainter(this.controller) : super(repaint: controller);
+  final DrawingController controller;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    canvas.drawColor(controller.backgroundColor, BlendMode.src);
+    for (final stamp in sortStampsByLayer(controller.stamps)) {
+      _paintStamp(canvas, stamp);
+    }
+    for (final stroke in controller.strokes) {
+      _paintStroke(canvas, stroke);
+    }
+    final points = controller.activePoints;
+    if (points.isNotEmpty && controller.isDrawing) {
+      _paintStroke(
+        canvas,
+        AdvancedStroke(
+          points: List<Offset>.from(points),
+          style: controller.brushStyle,
+          color: controller.brushColor,
+          width: controller.brushWidth,
+        ),
+      );
+    }
+    canvas.restore();
+  }
+
+  void _paintStroke(Canvas canvas, AdvancedStroke stroke) {
+    final path = stroke.toPath();
+    if (stroke.points.length == 1) {
+      final point = stroke.points.first;
+      if (stroke.style == StrokeStyle.neon) {
+        canvas.drawCircle(point, stroke.width * 1.1, Paint()
+          ..color = stroke.color.withOpacity(0.45)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, stroke.width * 0.8));
+        canvas.drawCircle(point, math.max(1.0, stroke.width * 0.32).toDouble(),
+            Paint()..color = Colors.white);
+      } else {
+        canvas.drawCircle(point, stroke.width / 2,
+            Paint()..color = stroke.style == StrokeStyle.rainbow ? Colors.purple : stroke.color);
+      }
+      return;
+    }
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke.width
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..isAntiAlias = true;
+
+    switch (stroke.style) {
+      case StrokeStyle.solid:
+        paint.color = stroke.color;
+        canvas.drawPath(path, paint);
+        break;
+      case StrokeStyle.neon:
+        final glow = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = stroke.width * 2.5
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..isAntiAlias = true
+          ..color = stroke.color.withOpacity(0.45)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, stroke.width * 0.75);
+        canvas.drawPath(path, glow);
+        paint..color = Colors.white..strokeWidth = math.max(1.0, stroke.width * 0.42).toDouble();
+        canvas.drawPath(path, paint);
+        break;
+      case StrokeStyle.rainbow:
+        final bounds = path.getBounds();
+        if (bounds.width < 0.5 || bounds.height < 0.5) {
+          paint.color = stroke.color;
+        } else {
+          paint.shader = ui.Gradient.linear(
+            bounds.topLeft, bounds.bottomRight,
+            const [
+              Color(0xFFFF3B30), Color(0xFFFF9500), Color(0xFFFFCC00),
+              Color(0xFF34C759), Color(0xFF00C7BE), Color(0xFF007AFF),
+              Color(0xFFAF52DE),
+            ],
+          );
+        }
+        canvas.drawPath(path, paint);
+        paint.shader = null;
+        break;
+    }
+  }
+
+  void _paintStamp(Canvas canvas, CanvasStamp stamp) {
+    canvas.save();
+    canvas.translate(stamp.position.dx, stamp.position.dy);
+    canvas.rotate(stamp.rotationAngle);
+    canvas.scale(stamp.scale);
+    final fill = Paint()..color = stamp.fillColor..style = PaintingStyle.fill..isAntiAlias = true;
+    final outline = Paint()
+      ..color = stamp.strokeColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..isAntiAlias = true;
+
+    Path poly(List<Offset> points) {
+      final p = Path()..moveTo(points.first.dx, points.first.dy);
+      for (final point in points.skip(1)) { p.lineTo(point.dx, point.dy); }
+      return p..close();
+    }
+
+    switch (stamp.kind) {
+      case StampKind.puppy:
+        canvas.drawOval(const Rect.fromLTWH(-42, -40, 84, 80), fill);
+        canvas.drawOval(const Rect.fromLTWH(-42, -40, 84, 80), outline);
+        canvas.drawOval(const Rect.fromLTWH(-52, -35, 23, 42), fill);
+        canvas.drawOval(const Rect.fromLTWH(29, -35, 23, 42), fill);
+        canvas.drawCircle(const Offset(-15, -10), 3.5, Paint()..color = Colors.black);
+        canvas.drawCircle(const Offset(15, -10), 3.5, Paint()..color = Colors.black);
+        canvas.drawOval(const Rect.fromLTWH(-8, 0, 16, 10), Paint()..color = Colors.brown);
+        canvas.drawArc(const Rect.fromLTWH(-16, 0, 32, 18), 0.2, 2.7, false, outline);
+        break;
+      case StampKind.sunshine:
+        canvas.drawCircle(Offset.zero, 28, fill);
+        canvas.drawCircle(Offset.zero, 28, outline);
+        for (var i = 0; i < 12; i++) {
+          final a = i * math.pi / 6;
+          canvas.drawLine(Offset(math.cos(a) * 35, math.sin(a) * 35),
+              Offset(math.cos(a) * 45, math.sin(a) * 45), outline);
+        }
+        canvas.drawCircle(const Offset(-9, -5), 3, Paint()..color = Colors.black);
+        canvas.drawCircle(const Offset(9, -5), 3, Paint()..color = Colors.black);
+        canvas.drawArc(const Rect.fromLTWH(-11, -1, 22, 15), 0.2, 2.7, false, outline);
+        break;
+      case StampKind.rocket:
+        canvas.drawOval(const Rect.fromLTWH(-22, -36, 44, 72), fill);
+        canvas.drawOval(const Rect.fromLTWH(-22, -36, 44, 72), outline);
+        canvas.drawPath(poly([const Offset(-22, 15), const Offset(-40, 36), const Offset(-17, 30)]), fill);
+        canvas.drawPath(poly([const Offset(22, 15), const Offset(40, 36), const Offset(17, 30)]), fill);
+        canvas.drawPath(poly([const Offset(-14, -33), const Offset(0, -50), const Offset(14, -33)]), fill);
+        canvas.drawCircle(const Offset(0, -12), 8, outline);
+        canvas.drawPath(poly([const Offset(-9, 35), const Offset(0, 47), const Offset(9, 35)]), Paint()..color = Colors.orange);
+        break;
+      case StampKind.unicorn:
+        canvas.drawOval(const Rect.fromLTWH(-39, -30, 76, 63), fill);
+        canvas.drawOval(const Rect.fromLTWH(-39, -30, 76, 63), outline);
+        canvas.drawPath(poly([const Offset(-7, -28), const Offset(2, -52), const Offset(12, -27)]), Paint()..color = Colors.amber);
+        canvas.drawPath(poly([const Offset(-30, -27), const Offset(-44, -44), const Offset(-16, -36)]), fill);
+        canvas.drawCircle(const Offset(-14, -6), 3, Paint()..color = Colors.black);
+        canvas.drawArc(const Rect.fromLTWH(-15, 0, 24, 18), 0.1, 2.8, false, outline);
+        break;
+      case StampKind.house:
+        canvas.drawRect(const Rect.fromLTWH(-31, -10, 62, 48), fill);
+        canvas.drawRect(const Rect.fromLTWH(-31, -10, 62, 48), outline);
+        final roof = poly([const Offset(-40, -10), const Offset(0, -43), const Offset(40, -10)]);
+        canvas.drawPath(roof, fill);
+        canvas.drawPath(roof, outline);
+        canvas.drawRect(const Rect.fromLTWH(-7, 12, 14, 26), outline);
+        canvas.drawRect(const Rect.fromLTWH(-24, 0, 11, 11), outline);
+        canvas.drawRect(const Rect.fromLTWH(13, 0, 11, 11), outline);
+        break;
+      case StampKind.flower:
+        for (var i = 0; i < 6; i++) {
+          final a = i * math.pi / 3;
+          final center = Offset(math.cos(a) * 18, math.sin(a) * 18);
+          canvas.drawCircle(center, 13, fill);
+          canvas.drawCircle(center, 13, outline);
+        }
+        canvas.drawCircle(Offset.zero, 12, Paint()..color = Colors.amber);
+        canvas.drawLine(const Offset(0, 27), const Offset(0, 46), outline);
+        canvas.drawOval(const Rect.fromLTWH(0, 32, 18, 8), Paint()..color = Colors.green);
+        break;
+      case StampKind.pond:
+        const pondRect = Rect.fromLTRB(-46, -30, 46, 30);
+        canvas.drawOval(pondRect, fill);
+        canvas.drawOval(pondRect, outline);
+        canvas.drawArc(const Rect.fromLTWH(-24, -12, 38, 18), 0.2, 2.4, false, outline);
+        canvas.drawArc(const Rect.fromLTWH(-5, 3, 37, 18), 0.2, 2.4, false, outline);
+        break;
+      case StampKind.fish:
+        final body = Path()..addOval(const Rect.fromLTWH(-30, -18, 54, 36));
+        canvas.drawPath(body, fill);
+        canvas.drawPath(body, outline);
+        final tail = poly([const Offset(20, 0), const Offset(42, -16), const Offset(42, 16)]);
+        canvas.drawPath(tail, fill);
+        canvas.drawPath(tail, outline);
+        canvas.drawCircle(const Offset(-14, -4), 3, Paint()..color = Colors.black);
+        break;
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _DrawingPainter old) =>
+      old.controller != controller || old.controller.revision != controller.revision;
+}
