@@ -12,7 +12,7 @@ if (localPropertiesFile.exists()) {
     }
 }
 
-def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "20261021"
+def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "20261022"
 def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.3"
 
 // -----------------------------------------------------------------------------
@@ -50,7 +50,7 @@ android {
         // Google Mobile Ads SDK requirement: minSdkVersion 21 or higher
         minSdkVersion 21
         targetSdkVersion 36
-        versionCode 20261021
+        versionCode 20261022
         versionName "1.0.3"
         multiDexEnabled true
     }
