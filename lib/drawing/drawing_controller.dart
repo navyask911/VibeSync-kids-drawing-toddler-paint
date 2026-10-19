@@ -371,6 +371,69 @@ class DrawingController extends ChangeNotifier {
     }
   }
 
+
+  /// Loads a validated local snapshot as this session's baseline.
+  /// Previous-session edits are preserved; this session starts with fresh
+  /// undo/redo stacks so the app never fabricates unavailable command history.
+  void restoreSnapshot({
+    required Iterable<AdvancedStroke> strokes,
+    required Iterable<CanvasStamp> stamps,
+    required Iterable<CanvasFill> fills,
+    required Color restoredBackgroundColor,
+    required Color restoredBrushColor,
+    required Color restoredBucketColor,
+    required Color restoredStampFillColor,
+    required Color restoredStampStrokeColor,
+    required double restoredBrushWidth,
+    required StrokeStyle restoredBrushStyle,
+    required ActiveTool restoredActiveTool,
+    required StampKind restoredSelectedStamp,
+    required ColoringPage restoredSelectedPage,
+  }) {
+    for (final image in _ownedImages) {
+      image.dispose();
+    }
+    _ownedImages.clear();
+    _strokes
+      ..clear()
+      ..addAll(strokes);
+    _stamps
+      ..clear()
+      ..addAll(stamps);
+    _fills
+      ..clear()
+      ..addAll(fills);
+    _ownedImages.addAll(_fills.map((fill) => fill.image));
+
+    backgroundColor = restoredBackgroundColor;
+    brushColor = restoredBrushColor;
+    bucketColor = restoredBucketColor;
+    stampFillColor = restoredStampFillColor;
+    stampStrokeColor = restoredStampStrokeColor;
+    brushWidth = restoredBrushWidth.clamp(1.0, 32.0).toDouble();
+    brushStyle = restoredBrushStyle;
+    activeTool = restoredActiveTool;
+    selectedStamp = restoredSelectedStamp;
+    selectedPage = restoredSelectedPage;
+    _activePoints = null;
+    _undoStack.clear();
+    _redoStack.clear();
+
+    var nextOrder = 0;
+    for (final stroke in _strokes) {
+      if (stroke.order >= nextOrder) nextOrder = stroke.order + 1;
+    }
+    for (final stamp in _stamps) {
+      if (stamp.order >= nextOrder) nextOrder = stamp.order + 1;
+    }
+    _nextOrder = nextOrder;
+
+    notifyListeners();
+    backgroundRepaint.notifyListeners();
+    sceneRepaint.notifyListeners();
+    activeRepaint.notifyListeners();
+  }
+
   @override
   void dispose() {
     for (final image in _ownedImages) {
