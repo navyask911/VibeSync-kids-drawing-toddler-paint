@@ -78,6 +78,9 @@ class DrawingController extends ChangeNotifier {
     );
   }
   bool get canUndo => _undo.isNotEmpty;
+
+  /// Requests a canvas repaint after an asynchronously decoded raster layer is ready.
+  void notifyRasterImagesChanged() => _notify(persist: false);
   bool get hasRasterFills => _fills.isNotEmpty;
   bool get canRedo => _redo.isNotEmpty;
 

@@ -1,67 +1,311 @@
+import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import 'drawing_controller.dart';
 import 'drawing_models.dart';
+import 'flood_fill_engine.dart';
 
-class DrawingCanvas extends StatelessWidget {
+class DrawingCanvas extends StatefulWidget {
   const DrawingCanvas({
     required this.controller,
     required this.onDrawingStateChanged,
+    required this.onBucketResult,
     this.guideTemplate,
     super.key,
   });
 
   final DrawingController controller;
   final ValueChanged<bool> onDrawingStateChanged;
+  final ValueChanged<String> onBucketResult;
   final StampKind? guideTemplate;
+
+  @override
+  State<DrawingCanvas> createState() => _DrawingCanvasState();
+}
+
+class _DrawingCanvasState extends State<DrawingCanvas> {
+  final Map<String, ui.Image> _fillImages = {};
+  final Map<String, Future<void>> _fillLoads = {};
+  bool _bucketBusy = false;
+  int _fillGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onControllerChanged);
+    _syncFillImages();
+  }
+
+  @override
+  void didUpdateWidget(covariant DrawingCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onControllerChanged);
+      _disposeFillImages();
+      widget.controller.addListener(_onControllerChanged);
+      _syncFillImages();
+    }
+  }
+
+  void _onControllerChanged() => _syncFillImages();
+
+  void _disposeFillImages() {
+    _fillGeneration++;
+    for (final image in _fillImages.values) {
+      image.dispose();
+    }
+    _fillImages.clear();
+    _fillLoads.clear();
+  }
+
+  void _syncFillImages() {
+    final existing = widget.controller.fills.map((layer) => layer.id).toSet();
+    final staleIds = _fillImages.keys.where((id) => !existing.contains(id)).toList();
+    for (final id in staleIds) {
+      _fillImages.remove(id)?.dispose();
+    }
+    for (final layer in widget.controller.fills) {
+      if (!_fillImages.containsKey(layer.id) && !_fillLoads.containsKey(layer.id)) {
+        unawaited(_loadFillImage(layer));
+      }
+    }
+  }
+
+  Future<void> _loadFillImage(CanvasFillLayer layer) async {
+    final id = layer.id;
+    final generation = _fillGeneration;
+    final operation = () async {
+      try {
+        final image = await ui.decodeImageFromList(Uint8List.fromList(layer.pngBytes));
+        final stillExists = widget.controller.fills.any((item) => item.id == id);
+        if (!mounted || generation != _fillGeneration || !stillExists) {
+          image.dispose();
+          return;
+        }
+        _fillImages[id] = image;
+        widget.controller.notifyRasterImagesChanged();
+      } catch (error) {
+        debugPrint('Unable to decode saved fill layer $id: $error');
+      } finally {
+        _fillLoads.remove(id);
+      }
+    }();
+    _fillLoads[id] = operation;
+    await operation;
+  }
+
+  Future<void> _ensureFillImagesLoaded() async {
+    for (final layer in widget.controller.fills.toList()) {
+      if (_fillImages.containsKey(layer.id)) continue;
+      final pending = _fillLoads[layer.id];
+      if (pending != null) {
+        await pending;
+      } else {
+        await _loadFillImage(layer);
+      }
+      if (!_fillImages.containsKey(layer.id)) {
+        throw StateError('A saved raster fill layer could not be decoded.');
+      }
+    }
+  }
+
+  Future<Uint8List> _encodeRgbaAsPng(Uint8List rgba, int width, int height) async {
+    final buffer = await ui.ImmutableBuffer.fromUint8List(rgba);
+    ui.ImageDescriptor? descriptor;
+    ui.Codec? codec;
+    ui.FrameInfo? frame;
+    try {
+      descriptor = ui.ImageDescriptor.raw(
+        buffer,
+        width: width,
+        height: height,
+        pixelFormat: ui.PixelFormat.rgba8888,
+      );
+      codec = await descriptor.instantiateCodec();
+      frame = await codec.getNextFrame();
+      final byteData = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) throw StateError('PNG encoding returned no data.');
+      return Uint8List.fromList(byteData.buffer.asUint8List(
+        byteData.offsetInBytes,
+        byteData.lengthInBytes,
+      ));
+    } finally {
+      frame?.image.dispose();
+      codec?.dispose();
+      descriptor?.dispose();
+      buffer.dispose();
+    }
+  }
+
+  Future<void> _paintBucketAt(Offset point, Size logicalSize) async {
+    if (_bucketBusy) {
+      widget.onBucketResult('bucket_busy');
+      return;
+    }
+    if (logicalSize.width <= 0 || logicalSize.height <= 0 ||
+        point.dx < 0 || point.dy < 0 ||
+        point.dx >= logicalSize.width || point.dy >= logicalSize.height) return;
+
+    _bucketBusy = true;
+    final generation = _fillGeneration;
+    ui.Image? composite;
+    try {
+      await _ensureFillImagesLoaded();
+      if (!mounted || generation != _fillGeneration) return;
+
+      const safePixelLimit = 2000000;
+      final deviceRatio = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 3.0).toDouble();
+      final logicalPixels = logicalSize.width * logicalSize.height;
+      final ratio = math.min(deviceRatio, math.sqrt(safePixelLimit / logicalPixels))
+          .clamp(0.5, 3.0).toDouble();
+      final width = math.max(1, (logicalSize.width * ratio).round());
+      final height = math.max(1, (logicalSize.height * ratio).round());
+      if (width > safePixelLimit ~/ height) {
+        widget.onBucketResult('bucket_failed');
+        return;
+      }
+
+      final recorder = ui.PictureRecorder();
+      final recordingCanvas = Canvas(recorder)..scale(ratio);
+      _DrawingPainter(widget.controller, widget.guideTemplate, _fillImages)
+          .paint(recordingCanvas, logicalSize);
+      final picture = recorder.endRecording();
+      try {
+        composite = await picture.toImage(width, height);
+      } finally {
+        picture.dispose();
+      }
+
+      final rawData = await composite.toByteData(format: ui.ImageByteFormat.rawRgba);
+      composite.dispose();
+      composite = null;
+      if (rawData == null) {
+        widget.onBucketResult('bucket_failed');
+        return;
+      }
+      final rawBytes = Uint8List.fromList(rawData.buffer.asUint8List(
+        rawData.offsetInBytes,
+        rawData.lengthInBytes,
+      ));
+      final color = widget.controller.bucketColor.toARGB32();
+      final result = await floodFillRgba(
+        sourceRgba: rawBytes,
+        width: width,
+        height: height,
+        seedX: (point.dx * ratio).floor().clamp(0, width - 1),
+        seedY: (point.dy * ratio).floor().clamp(0, height - 1),
+        fillRgba: [
+          (color >> 16) & 0xff,
+          (color >> 8) & 0xff,
+          color & 0xff,
+          (color >> 24) & 0xff,
+        ],
+        tolerance: 18,
+        maxPixels: safePixelLimit,
+        maxRegionPixels: 500000,
+      );
+      if (!mounted || generation != _fillGeneration) return;
+      if (result.exceededRegionLimit) {
+        widget.onBucketResult('bucket_large_area');
+        return;
+      }
+      if (result.filledPixels == 0) {
+        widget.onBucketResult('bucket_no_change');
+        return;
+      }
+
+      final pngBytes = await _encodeRgbaAsPng(result.overlayRgba, width, height);
+      if (!mounted || generation != _fillGeneration) return;
+      final committed = widget.controller.commitFillLayer(
+        pngBytes: pngBytes,
+        logicalWidth: logicalSize.width,
+        logicalHeight: logicalSize.height,
+      );
+      if (!committed) {
+        widget.onBucketResult('bucket_storage_limit');
+        return;
+      }
+      widget.onBucketResult('bucket_filled');
+    } catch (error, stackTrace) {
+      debugPrint('Paint bucket failed safely: $error\n$stackTrace');
+      if (mounted) widget.onBucketResult('bucket_failed');
+    } finally {
+      composite?.dispose();
+      _bucketBusy = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) => RepaintBoundary(
         child: ClipRect(
-          child: Listener(
-            behavior: HitTestBehavior.opaque,
-            onPointerDown: (event) {
-              if (controller.activeTool == ActiveTool.stamp) {
-                controller.placeSelectedStamp(event.localPosition);
-                return;
-              }
-              if (controller.activeTool == ActiveTool.paintBucket) return;
-              controller.beginStroke(event.localPosition);
-              onDrawingStateChanged(controller.isDrawing);
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final canvasSize = constraints.biggest;
+              return Listener(
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: (event) {
+                  if (widget.controller.activeTool == ActiveTool.stamp) {
+                    widget.controller.placeSelectedStamp(event.localPosition);
+                    return;
+                  }
+                  if (widget.controller.activeTool == ActiveTool.paintBucket) {
+                    unawaited(_paintBucketAt(event.localPosition, canvasSize));
+                    return;
+                  }
+                  widget.controller.beginStroke(event.localPosition);
+                  widget.onDrawingStateChanged(widget.controller.isDrawing);
+                },
+                onPointerMove: (event) {
+                  if (widget.controller.isDrawing) widget.controller.extendStroke(event.localPosition);
+                },
+                onPointerUp: (_) {
+                  widget.controller.endStroke();
+                  widget.onDrawingStateChanged(false);
+                },
+                onPointerCancel: (_) {
+                  widget.controller.cancelStroke(keepPartialStroke: true);
+                  widget.onDrawingStateChanged(false);
+                },
+                child: CustomPaint(
+                  painter: _DrawingPainter(widget.controller, widget.guideTemplate, _fillImages),
+                  size: canvasSize,
+                ),
+              );
             },
-            onPointerMove: (event) {
-              if (controller.isDrawing) controller.extendStroke(event.localPosition);
-            },
-            onPointerUp: (_) {
-              controller.endStroke();
-              onDrawingStateChanged(false);
-            },
-            onPointerCancel: (_) {
-              controller.cancelStroke(keepPartialStroke: true);
-              onDrawingStateChanged(false);
-            },
-            child: CustomPaint(
-              painter: _DrawingPainter(controller, guideTemplate),
-              size: Size.infinite,
-            ),
           ),
         ),
       );
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    _disposeFillImages();
+    super.dispose();
+  }
 }
 
 class _DrawingPainter extends CustomPainter {
-  _DrawingPainter(this.controller, this.guideTemplate) : super(repaint: controller);
+  _DrawingPainter(this.controller, this.guideTemplate, this.fillImages) : super(repaint: controller);
   final DrawingController controller;
   final StampKind? guideTemplate;
+  final Map<String, ui.Image> fillImages;
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
     canvas.clipRect(Offset.zero & size);
     canvas.drawColor(controller.backgroundColor, BlendMode.src);
+    for (final layer in controller.fills) {
+      final image = fillImages[layer.id];
+      if (image == null) continue;
+      final sourceRect = Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble());
+      final destinationRect = Rect.fromLTWH(0, 0, layer.logicalWidth, layer.logicalHeight);
+      canvas.drawImageRect(image, sourceRect, destinationRect, Paint()..filterQuality = FilterQuality.low);
+    }
 
     final guide = guideTemplate;
     if (guide != null && size.width > 0 && size.height > 0) {
@@ -263,5 +507,6 @@ class _DrawingPainter extends CustomPainter {
   bool shouldRepaint(covariant _DrawingPainter old) =>
       old.controller != controller ||
       old.controller.revision != controller.revision ||
-      old.guideTemplate != guideTemplate;
+      old.guideTemplate != guideTemplate ||
+      old.fillImages != fillImages;
 }

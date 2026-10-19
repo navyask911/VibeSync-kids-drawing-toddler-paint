@@ -601,6 +601,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                   controller: _drawing,
                   guideTemplate: _selectedTemplate,
                   onDrawingStateChanged: (active) => setState(() => _isDrawingActive = active),
+                  onBucketResult: (key) => _showMessage(AppLocalizations.of(context).translate(key)),
                 ),
                 if (_isRestoringDrawing)
                   Align(
@@ -699,13 +700,11 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                 onSelected: _isDrawingActive ? null : (_) => setState(() => _drawing.selectTool(ActiveTool.stamp)),
               ),
               const SizedBox(width: 6),
-              Tooltip(
-                message: l10n.translate('bucket_unavailable'),
-                child: Chip(
-                  avatar: const Icon(Icons.format_color_fill, size: 17),
-                  label: const Text('Bucket'),
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
+              ChoiceChip(
+                selected: _drawing.activeTool == ActiveTool.paintBucket,
+                avatar: const Icon(Icons.format_color_fill, size: 17),
+                label: Text(l10n.translate('bucket')),
+                onSelected: _isDrawingActive ? null : (_) => setState(() => _drawing.selectTool(ActiveTool.paintBucket)),
               ),
             ],
           ),
@@ -745,29 +744,39 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
         ),
       );
 
-  Widget _buildBrushColors(AppLocalizations l10n, List<Color> colors) => SizedBox(
-        height: 42,
-        child: Row(
-          children: [
-            const SizedBox(width: 12),
-            Text(l10n.translate('colors'), style: const TextStyle(fontSize: 12)),
-            const SizedBox(width: 6),
-            Expanded(
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-                itemCount: colors.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 5),
-                itemBuilder: (context, index) => _colorButton(
-                  colors[index],
-                  selected: _drawing.brushColor == colors[index],
-                  onPressed: () => setState(() => _drawing.selectBrushColor(colors[index])),
-                ),
+  Widget _buildBrushColors(AppLocalizations l10n, List<Color> colors) {
+    final isBucket = _drawing.activeTool == ActiveTool.paintBucket;
+    final selectedColor = isBucket ? _drawing.bucketColor : _drawing.brushColor;
+    return SizedBox(
+      height: 42,
+      child: Row(
+        children: [
+          const SizedBox(width: 12),
+          Text(l10n.translate(isBucket ? 'fill_color' : 'colors'), style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+              itemCount: colors.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 5),
+              itemBuilder: (context, index) => _colorButton(
+                colors[index],
+                selected: selectedColor == colors[index],
+                onPressed: () => setState(() {
+                  if (isBucket) {
+                    _drawing.selectBucketColor(colors[index]);
+                  } else {
+                    _drawing.selectBrushColor(colors[index]);
+                  }
+                }),
               ),
             ),
-          ],
-        ),
-      );
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildBackgroundColors(AppLocalizations l10n, List<Color> colors) => SizedBox(
         height: 40,
