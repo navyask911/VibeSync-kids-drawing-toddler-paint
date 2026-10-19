@@ -44,3 +44,8 @@ GitHub Actions builds an AAB and APK, runs tests and static analysis, and upload
 ## Android release versioning
 
 This release candidate uses version name `1.0.1` and build/version code `20261019` (from `version: 1.0.1+20261019` in `pubspec.yaml`). The AAB and APK from the same release use the same version code. Before preparing a later Play Store release, increment both the version name as appropriate and the numeric value after `+`. GitHub Actions verifies that pull requests and pushes to `main` use a numeric code higher than the base revision. A manually dispatched release must select the `release` input to enable the same guard. This blocks accidental reuse or lowering of a build number; Play Console's existing codes must still be checked before publishing.
+
+
+## Privacy policy maintenance
+
+The privacy policy now describes app-private local drawing auto-save and distinguishes it from the Google Mobile Ads SDK's possible data processing. Keep the published policy synchronized with SDK upgrades, new export/support features, and the actual Play Console Data safety disclosures. The current policy is an implementation description, not legal advice or a compliance certification.
