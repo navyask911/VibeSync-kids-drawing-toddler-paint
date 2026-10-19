@@ -73,7 +73,7 @@ Text('$a + $b = ?') // Randomized adult arithmetic
           Ad Safety Implementation Reference — Not Certification
         </div>
         <h2 className="text-2xl font-bold text-white tracking-tight">
-          AdMob Compliance Guide for Kids Applications
+          Ad Safety Implementation Reference for Child-Directed Apps
         </h2>
         <p className="text-sm text-slate-400 mt-2 leading-relaxed">
           Google Play enforces stringent guidelines on apps targeting children under 13.
