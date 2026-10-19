@@ -61,6 +61,20 @@ void main() {
       expect(controller.canRedo, isFalse);
     });
 
+    test('raster fill layers participate in undo and redo', () {
+      final committed = controller.commitFillLayer(
+        pngBytes: Uint8List.fromList([1, 2, 3]),
+        logicalWidth: 120,
+        logicalHeight: 180,
+      );
+      expect(committed, isTrue);
+      expect(controller.fills, hasLength(1));
+      controller.undo();
+      expect(controller.fills, isEmpty);
+      controller.redo();
+      expect(controller.fills, hasLength(1));
+    });
+
     test('stamps are sorted by layer and then stable insertion order', () {
       CanvasStamp make(String id, LayerCategory layer, int order) => CanvasStamp(
         id: id, kind: StampKind.flower, position: Offset.zero, scale: 1,

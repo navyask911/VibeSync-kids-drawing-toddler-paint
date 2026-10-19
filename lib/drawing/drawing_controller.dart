@@ -323,6 +323,10 @@ class DrawingController extends ChangeNotifier {
     try {
       final file = await _resolveDocumentFile();
       if (!await file.exists()) return;
+      if (await file.length() > 40 * 1024 * 1024) {
+        debugPrint('Saved drawing exceeds the safe restore size limit; starting with a blank canvas.');
+        return;
+      }
       final encoded = await file.readAsString();
       // Never overwrite work started while file I/O was pending.
       if (_userEditedDuringRestore || _documentRevision != 0 ||

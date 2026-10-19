@@ -191,7 +191,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         rawData.offsetInBytes,
         rawData.lengthInBytes,
       ));
-      final color = widget.controller.bucketColor.toARGB32();
+      final color = widget.controller.bucketColor.value;
       final result = await floodFillRgba(
         sourceRgba: rawBytes,
         width: width,
