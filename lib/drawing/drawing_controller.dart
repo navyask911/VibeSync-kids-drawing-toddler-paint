@@ -241,6 +241,7 @@ class DrawingController extends ChangeNotifier {
     _pushUndoSnapshot();
     _strokes.clear();
     _stamps.clear();
+    _fills.clear();
     _activePoints.clear();
     _isDrawing = false;
     _documentRevision++;

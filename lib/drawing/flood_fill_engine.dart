@@ -1,5 +1,7 @@
-import 'dart:typed_data';
 import 'dart:isolate';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 
 @immutable
 class FloodFillResult {
@@ -59,7 +61,6 @@ Future<FloodFillResult> floodFillRgba({
     seedY: seedY,
     fillRgba: List<int>.unmodifiable(fillRgba),
     tolerance: tolerance.clamp(0, 96),
-    maxPixels: maxPixels,
     maxRegionPixels: maxRegionPixels,
   );
   return Isolate.run(() => _floodFillSync(request));
@@ -74,7 +75,6 @@ class _FloodFillRequest {
     required this.seedY,
     required this.fillRgba,
     required this.tolerance,
-    required this.maxPixels,
     required this.maxRegionPixels,
   });
 
@@ -85,7 +85,6 @@ class _FloodFillRequest {
   final int seedY;
   final List<int> fillRgba;
   final int tolerance;
-  final int maxPixels;
   final int maxRegionPixels;
 }
 
