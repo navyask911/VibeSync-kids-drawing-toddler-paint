@@ -18,7 +18,8 @@
   <p>VibeSync Kids Drawing Toddler Paint is a child-oriented drawing app. Parents and guardians should review this policy and the app's Google Play privacy disclosures before use.</p>
 
   <h2>2. Information and Artwork</h2>
-  <p>The app does not implement user accounts, a developer-operated backend or cloud synchronization. Drawing strokes are held in app memory while the drawing screen is open. A parent-gated export option renders the current canvas to a temporary PNG on the device and opens the operating system share sheet; the image is sent only to the app selected by the user. That recipient app may process the image under its own practices.</p>
+  <p>The app does not implement user accounts, a developer-operated backend or cloud synchronization. The current drawing (including strokes, stickers, pad color, selected template and raster fill layers) is automatically saved to app-private storage on the device and restored after an ordinary app restart. This autosave is local and is not uploaded by this app. It may be removed when app data is cleared or the app is uninstalled; previous-session undo history is not retained.</p>
+  <p>A parent-gated export option renders the current canvas to a temporary PNG on the device and opens the operating system share sheet; the image is passed only to the app selected by the parent/user. That recipient app may process the image under its own practices. This app does not upload exported drawings to a developer-operated server.</p>
   <p>The app integrates Google Mobile Ads. Google Mobile Ads and related ad services may process technical, diagnostics and advertising-interaction data subject to the provider's policies, the app's configuration and applicable law. The absence of a developer-operated backend should not be understood as a guarantee that no data is processed.</p>
 
   <h2>3. Network Status and Optional Support</h2>
@@ -26,11 +27,11 @@
 
   <h2>4. Advertising and Child-Directed Settings</h2>
   <p>The app configures child-directed ad treatment, a G-rated content ceiling and a non-personalized-ad request extra. These technical settings are safeguards, not a certification or guarantee of compliance with COPPA, GDPR-K or Google Play Families Policy. Ad serving, network configuration, parental-gate behavior and the Play Console declarations must be reviewed before release.</p>
-  <p>The current Flutter UI includes a parental gate before attempting to unlock bonus content through a rewarded ad. The interstitial helper is present in the code but is not currently called from the drawing screen.</p>
+  <p>Bonus coloring templates are behind an arithmetic parental gate. A rewarded ad is used only when a production rewarded ad unit has been configured for the release; otherwise a parent can unlock the template without an ad. Google's test rewarded/interstitial identifiers are only used by debug builds. The interstitial helper is present but is not currently called from the drawing screen.</p>
   <p>Google's policies and service information: <a href="https://policies.google.com/technologies/ads">Google advertising technologies</a> and <a href="https://support.google.com/googleplay/android-developer/answer/9893335">Google Play Families Policy</a>.</p>
 
   <h2>5. Permissions</h2>
-  <p>The Android app requests Internet and network-state permissions for ad functionality. It does not currently request photo, media or file permissions because saving drawings has not been implemented.</p>
+  <p>The Android app requests Internet and network-state permissions for ad functionality and connectivity checks. The app uses app-private storage for autosave and temporary export files and opens the native share sheet for user-initiated sharing, so it does not request broad photo, media or file-storage permissions.</p>
 
   <h2>6. Contact</h2>
   <p>For questions about this app, open the project repository: <a href="https://github.com/navyask911/VibeSync-kids-drawing-toddler-paint">VibeSync Kids Drawing Toddler Paint on GitHub</a>.</p>
