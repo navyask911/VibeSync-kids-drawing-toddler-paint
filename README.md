@@ -1,40 +1,40 @@
 # VibeSync Kids Drawing Toddler Paint
 
-A small Flutter drawing app for toddlers. The Android application lives in `lib/` and `android/`; `src/` is a separate React/Vite developer dashboard and source-code generator.
+A child-friendly Flutter drawing application with freehand drawing, brush styles, stickers, coloring templates, undo/redo and a bounded paint-bucket tool.
 
-## Current app features
+## App source
 
-- Freehand finger drawing on a canvas.
-- Six selectable brush colors and a clear-canvas action.
-- Bottom banner ad integration with a visual spacer separating the ad area from the canvas.
-- A randomized arithmetic parental gate before a rewarded-ad bonus-unlock attempt.
-- Child-directed AdMob request configuration, a G-rated content ceiling, under-age-of-consent flag and a non-personalized-ad request extra.
+- `lib/main.dart`: app shell, AdMob lifecycle, in-app update prompt, parent-gated support and language selection.
+- `lib/drawing/drawing_controller.dart`: drawing state, immutable stroke history, stamps, canvas fills and bounded undo/redo.
+- `lib/drawing/drawing_models.dart`: typed strokes, stamps, layers and coloring-page types.
+- `lib/drawing/drawing_painters.dart`: background/template/stamp/stroke painter layers with neon and rainbow styles.
+- `lib/drawing/drawing_canvas.dart`: pointer handling and asynchronous raster fill.
+- `lib/drawing/flood_fill.dart`: bounded non-recursive RGBA flood-fill algorithm that runs through Flutter's compute isolate.
+- `lib/l10n/app_localizations.dart`: initial English, Spanish, Hindi, Chinese, German and French strings.
+- `lib/ad_helper.dart`: existing AdMob request configuration and ad lifecycle helper.
+- `src/`: separate React/Vite developer dashboard and generated-code demonstration.
 
-## Important current limitations
+## Offline behavior and optional support
 
-- The four bonus entries are currently labels and unlock states, not finished coloring-page illustrations.
-- Brush color is currently applied by the painter to all stored strokes, so changing color can recolor previous strokes. Per-stroke color storage is still needed.
-- Drawings are held in memory only. Save/export, undo/redo, persistence and sharing are not implemented.
-- A wrong answer in the Flutter parental gate closes the dialog instead of offering another attempt.
-- The banner uses the configured app's banner ad unit. Rewarded and interstitial IDs in `lib/ad_helper.dart` are Google's test IDs; the interstitial helper is not currently called by the Flutter UI.
-- The ad settings are technical safeguards, not a certification or guarantee of COPPA, GDPR-K or Google Play Families Policy compliance. Verify the app's audience, consent/privacy disclosures, ad-network setup and ad placement in Play Console and AdMob before release.
+The drawing screen opens before ad/network initialization completes. Drawing operations remain local to the device and usable when the internet is unavailable. Internet status is checked so the app can show a non-blocking offline banner and retry update checks when the connection returns.
 
-## Repository map
+The Android in-app update prompt uses Google Play's in-app update API and therefore requires an eligible Google Play install and a published update. Local APKs and ordinary emulator runs cannot fully verify that native update flow.
 
-| Path | Purpose |
-| --- | --- |
-| `lib/main.dart` | Flutter drawing screen and parental gate |
-| `lib/ad_helper.dart` | AdMob initialization, request flags and ad lifecycle helpers |
-| `android/` | Android manifest, launcher resources and release configuration |
-| `test/admob_coppa_test.dart` | Flutter unit tests for selected ad/request invariants |
-| `src/` | React/Vite developer dashboard, simulator and generated Flutter templates |
-| `.github/workflows/build-aab.yml` | Android App Bundle/APK build workflow |
+An optional coffee/support action is available only after the arithmetic parent gate. Configure a valid HTTPS support page at build time:
 
-The web dashboard contains simulated ad playback and illustrative test-status UI. It does not execute Flutter tests or inspect a built APK.
+```sh
+flutter build appbundle --release --dart-define=COFFEE_SUPPORT_URL=https://your-real-support-page.example
+```
 
-## Build and test
+Replace the example with the actual creator-owned support URL before release. Without a configured URL, the app explains that the link has not been set and keeps all drawing features available. No support prompt is shown directly to children.
 
-Use a Flutter stable SDK and Java 17.
+## Advertising and child safety
+
+The app applies child-directed AdMob request settings and keeps the banner isolated from the drawing canvas. The rewarded/interstitial unit identifiers remain test IDs unless explicitly configured otherwise. A configuration flag is not a certification: verify the current Google Play Families policies, ad SDK eligibility, app content, privacy notice and Play Console declarations before release.
+
+## Build and verification
+
+Use Flutter stable and Java 17.
 
 ```sh
 flutter pub get
@@ -44,4 +44,4 @@ flutter analyze
 flutter build appbundle --release
 ```
 
-The GitHub Actions workflow builds a release AAB and APK and uploads them as workflow artifacts. Release signing must use the intended upload keystore; do not publish an artifact that was signed with the debug key.
+GitHub Actions runs launcher generation, Flutter tests, static analysis and release AAB/APK builds. Test the drawing canvas on physical Android devices and test native Play update flows through a Play testing track before production release.
