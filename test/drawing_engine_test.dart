@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kids_drawing_toddler_paint/drawing/drawing_controller.dart';
 import 'package:kids_drawing_toddler_paint/drawing/drawing_models.dart';
+import 'package:kids_drawing_toddler_paint/drawing/flood_fill_engine.dart';
 import 'package:kids_drawing_toddler_paint/l10n/app_localizations.dart';
 
 void main() {
@@ -83,6 +84,55 @@ void main() {
       expect(restored.style, source.style);
       expect(restored.color.value, source.color.value);
       expect(restored.width, source.width);
+    });
+  });
+
+  group('Flood fill engine', () {
+    test('fills only the four-connected region and returns a transparent overlay', () async {
+      const width = 5;
+      const height = 5;
+      final rgba = Uint8List(width * height * 4);
+      for (var y = 0; y < height; y++) {
+        for (var x = 0; x < width; x++) {
+          final o = (y * width + x) * 4;
+          final wall = x == 0 || x == 4 || y == 0 || y == 4;
+          rgba[o] = wall ? 0 : 255;
+          rgba[o + 1] = 0;
+          rgba[o + 2] = wall ? 0 : 255;
+          rgba[o + 3] = 255;
+        }
+      }
+      final result = await floodFillRgba(
+        sourceRgba: rgba, width: width, height: height,
+        seedX: 2, seedY: 2, fillRgba: const [255, 0, 0, 255],
+        maxPixels: 100, maxRegionPixels: 20,
+      );
+      expect(result.exceededRegionLimit, isFalse);
+      expect(result.filledPixels, 9);
+      expect(result.overlayRgba.length, rgba.length);
+      expect(result.overlayRgba[(2 * width + 2) * 4], 255);
+      expect(result.overlayRgba[3], 0);
+    });
+
+    test('rejects invalid seed and stops on an excessively large region', () async {
+      final rgba = Uint8List(20 * 20 * 4);
+      for (var i = 0; i < rgba.length; i += 4) {
+        rgba[i] = 20; rgba[i + 1] = 20; rgba[i + 2] = 20; rgba[i + 3] = 255;
+      }
+      await expectLater(
+        floodFillRgba(
+          sourceRgba: rgba, width: 20, height: 20,
+          seedX: -1, seedY: 0, fillRgba: const [0, 0, 255, 255],
+        ),
+        throwsRangeError,
+      );
+      final large = await floodFillRgba(
+        sourceRgba: rgba, width: 20, height: 20,
+        seedX: 10, seedY: 10, fillRgba: const [0, 0, 255, 255],
+        maxPixels: 400, maxRegionPixels: 100,
+      );
+      expect(large.exceededRegionLimit, isTrue);
+      expect(large.overlayRgba, isEmpty);
     });
   });
 

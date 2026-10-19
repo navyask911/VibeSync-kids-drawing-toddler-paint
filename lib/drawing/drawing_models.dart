@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 enum StrokeStyle { solid, neon, rainbow }
@@ -136,14 +138,31 @@ List<CanvasStamp> sortStampsByLayer(Iterable<CanvasStamp> source) {
 }
 
 @immutable
+class CanvasFillLayer {
+  CanvasFillLayer({
+    required this.id,
+    required Uint8List pngBytes,
+    required this.logicalWidth,
+    required this.logicalHeight,
+  }) : pngBytes = Uint8List.fromList(pngBytes);
+
+  final String id;
+  final Uint8List pngBytes;
+  final double logicalWidth;
+  final double logicalHeight;
+}
+
+@immutable
 class DrawingSnapshot {
   const DrawingSnapshot({
     required this.strokes,
     required this.stamps,
+    required this.fills,
     required this.backgroundColor,
   });
 
   final List<AdvancedStroke> strokes;
   final List<CanvasStamp> stamps;
+  final List<CanvasFillLayer> fills;
   final Color backgroundColor;
 }

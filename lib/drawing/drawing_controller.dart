@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -14,16 +15,21 @@ class DrawingController extends ChangeNotifier {
   DrawingController({this.persistenceEnabled = true});
 
   static const maxHistoryEntries = 100;
+  static const maxRasterFillLayers = 24;
+  static const maxRasterFillBytes = 8 * 1024 * 1024;
+  static const maxTotalRasterBytes = 24 * 1024 * 1024;
 
   final bool persistenceEnabled;
   final List<AdvancedStroke> _strokes = [];
   final List<CanvasStamp> _stamps = [];
+  final List<CanvasFillLayer> _fills = [];
   final List<Offset> _activePoints = [];
   final List<DrawingSnapshot> _undo = [];
   final List<DrawingSnapshot> _redo = [];
 
   late final List<AdvancedStroke> strokes = UnmodifiableListView(_strokes);
   late final List<CanvasStamp> stamps = UnmodifiableListView(_stamps);
+  late final List<CanvasFillLayer> fills = UnmodifiableListView(_fills);
 
   Color _backgroundColor = Colors.white;
   Color _brushColor = Colors.deepOrange;
@@ -72,6 +78,7 @@ class DrawingController extends ChangeNotifier {
     );
   }
   bool get canUndo => _undo.isNotEmpty;
+  bool get hasRasterFills => _fills.isNotEmpty;
   bool get canRedo => _redo.isNotEmpty;
 
   void selectTool(ActiveTool value) {
@@ -192,6 +199,33 @@ class DrawingController extends ChangeNotifier {
     _notify();
   }
 
+  /// Commits a transparent PNG overlay generated from a bounded raster flood
+  /// fill. Existing vector strokes/stamps remain editable and render over it.
+  bool commitFillLayer({
+    required Uint8List pngBytes,
+    required double logicalWidth,
+    required double logicalHeight,
+  }) {
+    if (pngBytes.isEmpty || pngBytes.length > maxRasterFillBytes) return false;
+    if (!logicalWidth.isFinite || !logicalHeight.isFinite ||
+        logicalWidth <= 0 || logicalHeight <= 0) return false;
+    if (_fills.length >= maxRasterFillLayers) return false;
+    final total = _fills.fold<int>(0, (sum, fill) => sum + fill.pngBytes.length);
+    if (total + pngBytes.length > maxTotalRasterBytes) return false;
+
+    _userEditedDuringRestore = true;
+    _pushUndoSnapshot();
+    _fills.add(CanvasFillLayer(
+      id: 'fill-${DateTime.now().microsecondsSinceEpoch}-${_fills.length}',
+      pngBytes: pngBytes,
+      logicalWidth: logicalWidth,
+      logicalHeight: logicalHeight,
+    ));
+    _documentRevision++;
+    _notify();
+    return true;
+  }
+
   void setBackgroundColor(Color value) {
     if (_backgroundColor == value) return;
     _userEditedDuringRestore = true;
@@ -202,7 +236,7 @@ class DrawingController extends ChangeNotifier {
   }
 
   void clearCanvas() {
-    if (_strokes.isEmpty && _stamps.isEmpty) return;
+    if (_strokes.isEmpty && _stamps.isEmpty && _fills.isEmpty) return;
     _userEditedDuringRestore = true;
     _pushUndoSnapshot();
     _strokes.clear();
@@ -233,12 +267,14 @@ class DrawingController extends ChangeNotifier {
   DrawingSnapshot _capture() => DrawingSnapshot(
         strokes: List<AdvancedStroke>.unmodifiable(_strokes),
         stamps: List<CanvasStamp>.unmodifiable(_stamps),
+        fills: List<CanvasFillLayer>.unmodifiable(_fills),
         backgroundColor: _backgroundColor,
       );
 
   void _restoreSnapshot(DrawingSnapshot state) {
     _strokes..clear()..addAll(state.strokes);
     _stamps..clear()..addAll(state.stamps);
+    _fills..clear()..addAll(state.fills);
     _backgroundColor = state.backgroundColor;
     _activePoints.clear();
     _isDrawing = false;
@@ -307,8 +343,38 @@ class DrawingController extends ChangeNotifier {
           if (raw is Map<String, dynamic>) loadedStamps.add(CanvasStamp.fromJson(raw));
         }
       }
-      _strokes.addAll(loadedStrokes);
+
+      final loadedFills = <CanvasFillLayer>[];
+      final rawFills = data['fills'];
+      if (rawFills is List && rawFills.length <= maxRasterFillLayers) {
+        for (final raw in rawFills) {
+          if (raw is Map<String, dynamic> &&
+              raw['png'] is String &&
+              raw['width'] is num &&
+              raw['height'] is num) {
+            try {
+              final bytes = base64Decode(raw['png'] as String);
+              if (bytes.isEmpty || bytes.length > maxRasterFillBytes) continue;
+              final logicalWidth = (raw['width'] as num).toDouble();
+              final logicalHeight = (raw['height'] as num).toDouble();
+              if (!logicalWidth.isFinite || !logicalHeight.isFinite ||
+                  logicalWidth <= 0 || logicalHeight <= 0) continue;
+              loadedFills.add(CanvasFillLayer(
+                id: (raw['id'] as String?) ?? 'restored-fill-${loadedFills.length}',
+                pngBytes: Uint8List.fromList(bytes),
+                logicalWidth: logicalWidth,
+                logicalHeight: logicalHeight,
+              ));
+            } catch (_) {
+              // Skip a corrupt raster layer without losing valid vector strokes.
+            }
+          }
+        }
+      }
+_strokes.addAll(loadedStrokes);
       _stamps.addAll(loadedStamps);
+      final rasterBytes = loadedFills.fold<int>(0, (sum, fill) => sum + fill.pngBytes.length);
+      if (rasterBytes <= maxTotalRasterBytes) _fills.addAll(loadedFills);
       if (data['background'] is num) {
         _backgroundColor = Color((data['background'] as num).toInt());
       }
@@ -343,6 +409,12 @@ class DrawingController extends ChangeNotifier {
         'background': _backgroundColor.value,
         'strokes': _strokes.map((s) => s.toJson()).toList(),
         'stamps': _stamps.map((s) => s.toJson()).toList(),
+        'fills': _fills.map((fill) => {
+          'id': fill.id,
+          'png': base64Encode(fill.pngBytes),
+          'width': fill.logicalWidth,
+          'height': fill.logicalHeight,
+        }).toList(),
       });
       await file.writeAsString(payload, flush: true);
     } catch (error) {
