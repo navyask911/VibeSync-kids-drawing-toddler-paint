@@ -34,7 +34,9 @@ class KidsDrawingApp extends StatefulWidget {
 }
 
 class _KidsDrawingAppState extends State<KidsDrawingApp> {
-  Locale _locale = const Locale('en');
+  // Null lets MaterialApp resolve the device's preferred supported locale.
+  // An explicit saved/user-selected locale overrides device locale resolution.
+  Locale? _locale;
 
   @override
   void initState() {
