@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,11 +10,14 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:in_app_update/in_app_update.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'ad_helper.dart';
 import 'drawing/drawing_canvas.dart';
 import 'drawing/drawing_controller.dart';
 import 'drawing/drawing_models.dart';
+import 'drawing/drawing_painters.dart';
 import 'l10n/app_localizations.dart';
 
 const String _coffeeSupportUrl = String.fromEnvironment('COFFEE_SUPPORT_URL');
@@ -78,6 +83,7 @@ class DrawingStudioScreen extends StatefulWidget {
 class _DrawingStudioScreenState extends State<DrawingStudioScreen>
     with WidgetsBindingObserver {
   final DrawingController _drawing = DrawingController();
+  final GlobalKey _canvasKey = GlobalKey();
   final Set<ColoringPage> _unlockedPages = <ColoringPage>{
     ColoringPage.puppy,
     ColoringPage.sunshine,
@@ -187,7 +193,10 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshInternetStatus());
-      if (_isOnline == true) unawaited(_checkForUpdate());
+      if (_isOnline == true) {
+        unawaited(_checkForUpdate());
+        unawaited(_initializeAdsIfOnline());
+      }
     }
   }
 
@@ -486,6 +495,71 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
       ColoringPage.rocket => strings.translate('rocket'),
       ColoringPage.unicorn => strings.translate('unicorn'),
     };
+  }
+
+
+  Future<void> _saveArtwork() async {
+    // Sharing is an external action, so it is available only after the parent gate.
+    if (!await _promptParentalGate() || !mounted) return;
+    final strings = AppLocalizations.of(context);
+    final renderObject = _canvasKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox || renderObject.size.isEmpty) {
+      _showMessage(strings.translate('save_failed'));
+      return;
+    }
+
+    final logicalSize = renderObject.size;
+    const pixelRatio = 1.5;
+    final pixelWidth = (logicalSize.width * pixelRatio).ceil();
+    final pixelHeight = (logicalSize.height * pixelRatio).ceil();
+    if (pixelWidth <= 0 ||
+        pixelHeight <= 0 ||
+        pixelWidth > 4096 ||
+        pixelHeight > 4096 ||
+        pixelWidth * pixelHeight > DrawingController.maxRasterPixels) {
+      _showMessage(strings.translate('save_too_large'));
+      return;
+    }
+
+    ui.Picture? picture;
+    ui.Image? image;
+    try {
+      final recorder = ui.PictureRecorder();
+      final exportCanvas = Canvas(
+        recorder,
+        Rect.fromLTWH(0, 0, logicalSize.width, logicalSize.height),
+      )..scale(pixelRatio);
+      paintFullSceneForRaster(exportCanvas, logicalSize, _drawing);
+      picture = recorder.endRecording();
+      image = await picture.toImage(pixelWidth, pixelHeight);
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (png == null) {
+        _showMessage(strings.translate('save_failed'));
+        return;
+      }
+
+      final directory = await getTemporaryDirectory();
+      final filename = 'vibesync-drawing-' +
+          DateTime.now().millisecondsSinceEpoch.toString() +
+          '.png';
+      final file = File(directory.path + Platform.pathSeparator + filename);
+      await file.writeAsBytes(
+        png.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes),
+        flush: true,
+      );
+
+      await Share.shareXFiles(
+        <XFile>[XFile(file.path)],
+        text: strings.translate('share_caption'),
+        subject: strings.translate('app_title'),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Artwork export failed safely: $error\\n$stackTrace');
+      if (mounted) _showMessage(strings.translate('save_failed'));
+    } finally {
+      image?.dispose();
+      picture?.dispose();
+    }
   }
 
   Future<void> _confirmClear() async {
@@ -905,6 +979,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
             _buildPagePicker(strings),
             Expanded(
               child: Container(
+                key: _canvasKey,
                 margin: const EdgeInsets.fromLTRB(8, 4, 8, 6),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -940,6 +1015,11 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                       tooltip: strings.translate('redo'),
                       onPressed: _drawing.canRedo ? _drawing.redo : null,
                       icon: const Icon(Icons.redo),
+                    ),
+                    IconButton(
+                      tooltip: strings.translate('save_share'),
+                      onPressed: _saveArtwork,
+                      icon: const Icon(Icons.ios_share),
                     ),
                     const Spacer(),
                     FilledButton.tonalIcon(

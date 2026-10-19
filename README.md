@@ -8,7 +8,7 @@ A child-friendly Flutter drawing application with freehand drawing, brush styles
 - `lib/drawing/drawing_controller.dart`: drawing state, immutable stroke history, stamps, canvas fills and bounded undo/redo.
 - `lib/drawing/drawing_models.dart`: typed strokes, stamps, layers and coloring-page types.
 - `lib/drawing/drawing_painters.dart`: background/template/stamp/stroke painter layers with neon and rainbow styles.
-- `lib/drawing/drawing_canvas.dart`: pointer handling and asynchronous raster fill.
+- `lib/drawing/drawing_canvas.dart`: pointer handling, asynchronous raster fill and parent-gated PNG sharing.
 - `lib/drawing/flood_fill.dart`: bounded non-recursive RGBA flood-fill algorithm that runs through Flutter's compute isolate.
 - `lib/l10n/app_localizations.dart`: initial English, Spanish, Hindi, Chinese, German and French strings.
 - `lib/ad_helper.dart`: existing AdMob request configuration and ad lifecycle helper.
@@ -19,6 +19,8 @@ A child-friendly Flutter drawing application with freehand drawing, brush styles
 The drawing screen opens before ad/network initialization completes. Drawing operations remain local to the device and usable when the internet is unavailable. Internet status is checked so the app can show a non-blocking offline banner and retry update checks when the connection returns.
 
 The Android in-app update prompt uses Google Play's in-app update API and therefore requires an eligible Google Play install and a published update. Local APKs and ordinary emulator runs cannot fully verify that native update flow.
+
+Parents can export artwork as a PNG through the system share sheet after passing the parent gate. The app creates a temporary local image; it does not upload artwork to a developer-operated server.
 
 An optional coffee/support action is available only after the arithmetic parent gate. Configure a valid HTTPS support page at build time:
 
