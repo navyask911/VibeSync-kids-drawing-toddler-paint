@@ -145,8 +145,8 @@ void _drawStroke(Canvas canvas, AdvancedStroke stroke) {
       canvas.saveLayer(
         bounds,
         Paint()..imageFilter = ui.ImageFilter.blur(
-          sigmaX: (stroke.width * 0.75).clamp(2.0, 8.0),
-          sigmaY: (stroke.width * 0.75).clamp(2.0, 8.0),
+          sigmaX: (stroke.width * 0.75).clamp(2.0, 8.0).toDouble(),
+          sigmaY: (stroke.width * 0.75).clamp(2.0, 8.0).toDouble(),
         ),
       );
       canvas.drawPath(
@@ -162,7 +162,7 @@ void _drawStroke(Canvas canvas, AdvancedStroke stroke) {
       canvas.drawPath(
         path,
         basePaint
-          ..strokeWidth = math.max(1.0, stroke.width * 0.48)
+          ..strokeWidth = math.max(1.0, stroke.width * 0.48).toDouble()
           ..color = Colors.white.withOpacity(0.95),
       );
       canvas.restore();
@@ -199,7 +199,7 @@ void _drawStamp(Canvas canvas, CanvasStamp stamp) {
   canvas.save();
   canvas.translate(stamp.position.dx, stamp.position.dy);
   canvas.rotate(stamp.rotationAngle);
-  canvas.scale(stamp.scale.clamp(0.2, 3.0));
+  canvas.scale(stamp.scale.clamp(0.2, 3.0).toDouble());
 
   final fill = Paint()
     ..color = stamp.fillColor
@@ -311,7 +311,7 @@ void _drawStamp(Canvas canvas, CanvasStamp stamp) {
 void _drawColoringTemplate(Canvas canvas, Size size, ColoringPage page) {
   if (page == ColoringPage.freeDraw) return;
 
-  final scale = (math.min(size.width, size.height) / 430).clamp(0.35, 1.15);
+  final scale = (math.min(size.width, size.height) / 430).clamp(0.35, 1.15).toDouble();
   canvas.save();
   canvas.translate(size.width / 2, size.height / 2);
   canvas.scale(scale);

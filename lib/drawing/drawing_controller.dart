@@ -268,7 +268,7 @@ class DrawingController extends ChangeNotifier {
   }
 
   bool addFillImage(ui.Image image, Size logicalSize) {
-    if (_fills.length >= maxFillLayers ||
+    if (_fills.length >= maxFillLayers || _ownedImages.length >= maxFillLayers ||
         logicalSize.width <= 0 ||
         logicalSize.height <= 0) {
       return false;

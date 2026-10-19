@@ -79,10 +79,10 @@ Uint8List floodFillRgba(Map<String, Object?> input) {
   while (head < tail) {
     final index = queue[head++];
     final offset = index * 4;
-    overlay[offset] = targetR.clamp(0, 255);
-    overlay[offset + 1] = targetG.clamp(0, 255);
-    overlay[offset + 2] = targetB.clamp(0, 255);
-    overlay[offset + 3] = targetA.clamp(0, 255);
+    overlay[offset] = targetR.clamp(0, 255).toInt();
+    overlay[offset + 1] = targetG.clamp(0, 255).toInt();
+    overlay[offset + 2] = targetB.clamp(0, 255).toInt();
+    overlay[offset + 3] = targetA.clamp(0, 255).toInt();
     filled++;
     if (filled > maxPixels) return Uint8List(0);
 

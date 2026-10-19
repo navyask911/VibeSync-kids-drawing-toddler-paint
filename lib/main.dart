@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:in_app_update/in_app_update.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -133,7 +134,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
     if (!mounted) return;
     final changed = _isOnline != online;
     if (changed) setState(() => _isOnline = online);
-    if (online) {
+    if (online && changed) {
       unawaited(_initializeAdsIfOnline());
       unawaited(_checkForUpdate());
     }
@@ -907,10 +908,12 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              child: Row(
-                children: <Widget>[
+            AnimatedBuilder(
+              animation: _drawing,
+              builder: (context, _) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                child: Row(
+                  children: <Widget>[
                   IconButton(
                     tooltip: strings.translate('undo'),
                     onPressed: _drawing.canUndo ? _drawing.undo : null,
@@ -925,9 +928,10 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                   FilledButton.tonalIcon(
                     onPressed: _confirmClear,
                     icon: const Icon(Icons.delete_outline, size: 18),
-                    label: Text(strings.translate('clear')),
+                      label: Text(strings.translate('clear')),
                   ),
-                ],
+                  ],
+                ),
               ),
             ),
             _buildAdDock(strings),
