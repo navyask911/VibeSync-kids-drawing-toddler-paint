@@ -32,10 +32,13 @@ Future<FloodFillResult> floodFillRgba({
   int maxPixels = 2000000,
   int maxRegionPixels = 500000,
 }) async {
+  const hardMaximumPixels = 2000000;
   if (width <= 0 || height <= 0) {
     throw ArgumentError('Image dimensions must be positive.');
   }
-  if (maxPixels <= 0 || width > maxPixels ~/ height) {
+  // Callers cannot bypass the allocation ceiling by passing a larger limit.
+  if (maxPixels <= 0 || maxPixels > hardMaximumPixels ||
+      width > maxPixels ~/ height) {
     throw ArgumentError('Image is larger than the configured safe pixel limit.');
   }
   final pixelCount = width * height;

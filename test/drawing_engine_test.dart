@@ -141,6 +141,21 @@ void main() {
       expect(result.overlayRgba[3], 0);
     });
 
+    test('does not allow callers to raise the hard allocation ceiling', () async {
+      await expectLater(
+        floodFillRgba(
+          sourceRgba: Uint8List(4 * 4 * 4),
+          width: 4,
+          height: 4,
+          seedX: 1,
+          seedY: 1,
+          fillRgba: const [255, 0, 0, 255],
+          maxPixels: 2000001,
+        ),
+        throwsArgumentError,
+      );
+    });
+
     test('rejects invalid seed and stops on an excessively large region', () async {
       final rgba = Uint8List(20 * 20 * 4);
       for (var i = 0; i < rgba.length; i += 4) {
