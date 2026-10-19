@@ -54,6 +54,7 @@ class DrawingController extends ChangeNotifier {
   bool _userEditedDuringRestore = false;
 
   int get revision => _revision;
+  int get documentRevision => _documentRevision;
   Color get backgroundColor => _backgroundColor;
   Color get brushColor => _brushColor;
   Color get bucketColor => _bucketColor;
@@ -64,7 +65,7 @@ class DrawingController extends ChangeNotifier {
   ActiveTool get activeTool => _activeTool;
   StampKind get selectedStamp => _selectedStamp;
   bool get isDrawing => _isDrawing;
-  List<Offset> get activePoints => _activePoints;
+  late final List<Offset> activePoints = UnmodifiableListView(_activePoints);
 
   /// Immutable snapshot of the active gesture, preserving the brush settings
   /// captured at pointer-down even if another state update happens mid-gesture.
@@ -390,6 +391,7 @@ _strokes.addAll(loadedStrokes);
         0,
         (maxOrder, stamp) => stamp.order >= maxOrder ? stamp.order + 1 : maxOrder,
       );
+      _documentRevision++;
       _notify(persist: false);
     } catch (error) {
       debugPrint('Drawing restore skipped: $error');

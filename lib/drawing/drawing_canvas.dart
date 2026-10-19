@@ -30,6 +30,8 @@ class DrawingCanvas extends StatefulWidget {
 class _DrawingCanvasState extends State<DrawingCanvas> {
   final Map<String, ui.Image> _fillImages = {};
   final Map<String, Future<void>> _fillLoads = {};
+  final _DrawingPictureCache _pictureCache = _DrawingPictureCache();
+  int _fillImageRevision = 0;
   bool _bucketBusy = false;
   int _fillGeneration = 0;
 
@@ -55,6 +57,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
 
   void _disposeFillImages() {
     _fillGeneration++;
+    _fillImageRevision++;
+    _pictureCache.invalidate();
     for (final image in _fillImages.values) {
       image.dispose();
     }
@@ -93,6 +97,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
           return;
         }
         _fillImages[id] = image;
+        _fillImageRevision++;
+        _pictureCache.invalidate();
         widget.controller.notifyRasterImagesChanged();
       } catch (error) {
         debugPrint('Unable to decode saved fill layer $id: $error');
@@ -180,7 +186,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
 
       final recorder = ui.PictureRecorder();
       final recordingCanvas = Canvas(recorder)..scale(ratio);
-      _DrawingPainter(widget.controller, widget.guideTemplate, _fillImages)
+      _DrawingPainter(widget.controller, widget.guideTemplate, _fillImages, _pictureCache, _fillImageRevision)
           .paint(recordingCanvas, logicalSize);
       final picture = recorder.endRecording();
       try {
@@ -284,7 +290,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
                   widget.onDrawingStateChanged(false);
                 },
                 child: CustomPaint(
-                  painter: _DrawingPainter(widget.controller, widget.guideTemplate, _fillImages),
+                  painter: _DrawingPainter(widget.controller, widget.guideTemplate, _fillImages, _pictureCache, _fillImageRevision),
                   size: canvasSize,
                 ),
               );
@@ -297,27 +303,124 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   void dispose() {
     widget.controller.removeListener(_onControllerChanged);
     _disposeFillImages();
+    _pictureCache.dispose();
     super.dispose();
   }
 }
 
+class _DrawingPictureCache {
+  ui.Picture? _picture;
+  int _documentRevision = -1;
+  Size? _size;
+  StampKind? _guideTemplate;
+  int _fillImageRevision = -1;
+
+  ui.Picture? get picture => _picture;
+
+  bool matches({
+    required int documentRevision,
+    required Size size,
+    required StampKind? guideTemplate,
+    required int fillImageRevision,
+  }) =>
+      _picture != null &&
+      _documentRevision == documentRevision &&
+      _size == size &&
+      _guideTemplate == guideTemplate &&
+      _fillImageRevision == fillImageRevision;
+
+  void replace({
+    required ui.Picture picture,
+    required int documentRevision,
+    required Size size,
+    required StampKind? guideTemplate,
+    required int fillImageRevision,
+  }) {
+    _picture?.dispose();
+    _picture = picture;
+    _documentRevision = documentRevision;
+    _size = size;
+    _guideTemplate = guideTemplate;
+    _fillImageRevision = fillImageRevision;
+  }
+
+  void invalidate() {
+    _picture?.dispose();
+    _picture = null;
+    _documentRevision = -1;
+    _size = null;
+    _guideTemplate = null;
+    _fillImageRevision = -1;
+  }
+
+  void dispose() => invalidate();
+}
+
 class _DrawingPainter extends CustomPainter {
-  _DrawingPainter(this.controller, this.guideTemplate, this.fillImages) : super(repaint: controller);
+  _DrawingPainter(
+    this.controller,
+    this.guideTemplate,
+    this.fillImages,
+    this.pictureCache,
+    this.fillImageRevision,
+  ) : super(repaint: controller);
+
   final DrawingController controller;
   final StampKind? guideTemplate;
   final Map<String, ui.Image> fillImages;
+  final _DrawingPictureCache pictureCache;
+  final int fillImageRevision;
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (!pictureCache.matches(
+      documentRevision: controller.documentRevision,
+      size: size,
+      guideTemplate: guideTemplate,
+      fillImageRevision: fillImageRevision,
+    )) {
+      final recorder = ui.PictureRecorder();
+      final documentCanvas = Canvas(recorder);
+      _paintCommittedDocument(documentCanvas, size);
+      final picture = recorder.endRecording();
+      pictureCache.replace(
+        picture: picture,
+        documentRevision: controller.documentRevision,
+        size: size,
+        guideTemplate: guideTemplate,
+        fillImageRevision: fillImageRevision,
+      );
+    }
+
+    final picture = pictureCache.picture;
+    if (picture != null) canvas.drawPicture(picture);
+
+    // The active stroke is separate: pointer movement replays the cached
+    // document picture and paints only this live path until the gesture commits.
+    final activeStroke = controller.activeStroke;
+    if (activeStroke != null) _paintStroke(canvas, activeStroke);
+  }
+
+  void _paintCommittedDocument(Canvas canvas, Size size) {
     canvas.save();
     canvas.clipRect(Offset.zero & size);
     canvas.drawColor(controller.backgroundColor, BlendMode.src);
+
     for (final layer in controller.fills) {
       final image = fillImages[layer.id];
       if (image == null) continue;
-      final sourceRect = Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble());
-      final destinationRect = Rect.fromLTWH(0, 0, layer.logicalWidth, layer.logicalHeight);
-      canvas.drawImageRect(image, sourceRect, destinationRect, Paint()..filterQuality = FilterQuality.low);
+      final sourceRect = Rect.fromLTWH(
+        0, 0, image.width.toDouble(), image.height.toDouble(),
+      );
+      final destinationRect = Rect.fromLTWH(
+        0, 0, layer.logicalWidth, layer.logicalHeight,
+      );
+      canvas.drawImageRect(
+        image,
+        sourceRect,
+        destinationRect,
+        Paint()..filterQuality = FilterQuality.low,
+      );
     }
 
     final guide = guideTemplate;
@@ -341,9 +444,6 @@ class _DrawingPainter extends CustomPainter {
     for (final stroke in controller.strokes) {
       _paintStroke(canvas, stroke);
     }
-
-    final activeStroke = controller.activeStroke;
-    if (activeStroke != null) _paintStroke(canvas, activeStroke);
     canvas.restore();
   }
 
