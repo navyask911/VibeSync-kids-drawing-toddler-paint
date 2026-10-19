@@ -50,8 +50,8 @@ android {
         // Google Mobile Ads SDK requirement: minSdkVersion 21 or higher
         minSdkVersion 21
         targetSdkVersion 36
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        versionCode 20261021
+        versionName "1.0.3"
         multiDexEnabled true
     }
 
