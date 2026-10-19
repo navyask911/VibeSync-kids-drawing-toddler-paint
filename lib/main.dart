@@ -25,7 +25,7 @@ class KidsDrawingApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: "Kids Drawing Studio",
+      title: "VibeSync Kids Drawing Toddler Paint",
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -222,7 +222,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('🎨 Toddler Drawing Pad'),
+        title: const Text('🎨 VibeSync Kids Drawing'),
         elevation: 0,
         backgroundColor: Colors.amber[300],
         actions: [

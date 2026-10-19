@@ -25,42 +25,33 @@ class AdHelper {
   bool _isInterstitialAdLoading = false;
 
   // ---------------------------------------------------------------------------
-  // 1. ADMOB UNIT IDENTIFIERS (Configured with Live Production AdMob IDs)
-  // ---------------------------------------------------------------------------
+  // 1. ADMOB UNIT IDENTIFIERS
+  // Rewarded/interstitial currently use official Google test units.
+  static const String androidBannerAdUnitId = 'ca-app-pub-4783826505860771/2828860731';
+  static const String iosBannerAdUnitId = 'ca-app-pub-4783826505860771/2828860731';
+  static const String androidRewardedAdUnitId = 'ca-app-pub-3940256099942544/5224354917';
+  static const String iosRewardedAdUnitId = 'ca-app-pub-3940256099942544/1712485313';
+  static const String androidInterstitialAdUnitId = 'ca-app-pub-3940256099942544/1033173712';
+  static const String iosInterstitialAdUnitId = 'ca-app-pub-3940256099942544/4411468910';
+
   static String get bannerAdUnitId {
-    if (Platform.isAndroid) {
-      // Production Android Banner Ad Unit ID
-      return 'ca-app-pub-4783826505860771/2828860731';
-    } else if (Platform.isIOS) {
-      return 'ca-app-pub-4783826505860771/2828860731';
-    } else {
-      throw UnsupportedError('Unsupported mobile platform for AdMob');
-    }
+    if (Platform.isAndroid) return androidBannerAdUnitId;
+    if (Platform.isIOS) return iosBannerAdUnitId;
+    throw UnsupportedError('Unsupported mobile platform for AdMob');
   }
 
   static String get rewardedAdUnitId {
-    if (Platform.isAndroid) {
-      // Official Google test ID until live rewarded unit is generated in console
-      return 'ca-app-pub-3940256099942544/5224354917';
-    } else if (Platform.isIOS) {
-      return 'ca-app-pub-3940256099942544/1712485313';
-    } else {
-      throw UnsupportedError('Unsupported mobile platform for AdMob');
-    }
+    if (Platform.isAndroid) return androidRewardedAdUnitId;
+    if (Platform.isIOS) return iosRewardedAdUnitId;
+    throw UnsupportedError('Unsupported mobile platform for AdMob');
   }
 
   static String get interstitialAdUnitId {
-    if (Platform.isAndroid) {
-      // Official Google test ID until live interstitial unit is generated in console
-      return 'ca-app-pub-3940256099942544/1033173712';
-    } else if (Platform.isIOS) {
-      return 'ca-app-pub-3940256099942544/4411468910';
-    } else {
-      throw UnsupportedError('Unsupported mobile platform for AdMob');
-    }
+    if (Platform.isAndroid) return androidInterstitialAdUnitId;
+    if (Platform.isIOS) return iosInterstitialAdUnitId;
+    throw UnsupportedError('Unsupported mobile platform for AdMob');
   }
 
-  // ---------------------------------------------------------------------------
   // 2. COPPA & GOOGLE PLAY FAMILIES GLOBAL INITIALIZATION
   // ---------------------------------------------------------------------------
   /// Initializes the Google Mobile Ads SDK with strict Families Policy settings.

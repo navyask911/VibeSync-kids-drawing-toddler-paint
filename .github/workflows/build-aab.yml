@@ -30,6 +30,12 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Generate Android launcher icons from the checked-in artwork
+        run: dart run flutter_launcher_icons
+
+      - name: Run Flutter unit tests
+        run: flutter test
+
       - name: Configure Release Keystore from Repository Secrets
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks

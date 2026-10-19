@@ -1,5 +1,5 @@
 name: kids_drawing_toddler_paint
-description: "Child-Safe Kids Drawing Studio with AdMob COPPA & Families Policy"
+description: "VibeSync Kids Drawing Toddler Paint with child-directed AdMob settings"
 publish_to: "none"
 version: 1.0.0+1
 
@@ -28,11 +28,11 @@ dev_dependencies:
 # Run: dart run flutter_launcher_icons
 # ==============================================================================
 flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: true
+  android: "ic_launcher"
+  ios: false
   image_path: "assets/icon/app_icon.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#FFFBEB"
+  adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
 
 flutter:

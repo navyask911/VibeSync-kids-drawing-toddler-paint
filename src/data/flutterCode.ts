@@ -1,5 +1,5 @@
 /**
- * Flutter Kids Drawing App - AdMob & COPPA Architecture
+ * VibeSync Kids Drawing Toddler Paint - AdMob & Flutter Architecture
  * Exportable production-grade Dart & XML snippets.
  */
 
@@ -40,7 +40,7 @@ export const PRODUCTION_CONFIG: AdMobConfig = {
 export function generateAdHelperDart(config: AdMobConfig, isUsingTestIds: boolean): string {
   return `// lib/ad_helper.dart
 // -----------------------------------------------------------------------------
-// Google Mobile Ads (AdMob) Singleton for Flutter Kids Drawing App
+// Google Mobile Ads (AdMob) Singleton for VibeSync Kids Drawing Toddler Paint
 // Strict COPPA, GDPR-K, and Google Play Families Policy Compliance
 // -----------------------------------------------------------------------------
 
@@ -68,34 +68,29 @@ class AdHelper {
   // 1. ADMOB UNIT IDENTIFIERS
   // ${isUsingTestIds ? 'NOTE: Currently configured with official Google AdMob Test IDs' : 'NOTE: Configured with your custom Live Production AdMob IDs'}
   // ---------------------------------------------------------------------------
+  static const String androidBannerAdUnitId = '${config.androidBannerUnitId}';
+  static const String iosBannerAdUnitId = '${config.iosBannerUnitId}';
+  static const String androidRewardedAdUnitId = '${config.androidRewardedUnitId}';
+  static const String iosRewardedAdUnitId = '${config.iosRewardedUnitId}';
+  static const String androidInterstitialAdUnitId = '${config.androidInterstitialUnitId}';
+  static const String iosInterstitialAdUnitId = '${config.iosInterstitialUnitId}';
+
   static String get bannerAdUnitId {
-    if (Platform.isAndroid) {
-      return '${config.androidBannerUnitId}';
-    } else if (Platform.isIOS) {
-      return '${config.iosBannerUnitId}';
-    } else {
-      throw UnsupportedError('Unsupported mobile platform for AdMob');
-    }
+    if (Platform.isAndroid) return androidBannerAdUnitId;
+    if (Platform.isIOS) return iosBannerAdUnitId;
+    throw UnsupportedError('Unsupported mobile platform for AdMob');
   }
 
   static String get rewardedAdUnitId {
-    if (Platform.isAndroid) {
-      return '${config.androidRewardedUnitId}';
-    } else if (Platform.isIOS) {
-      return '${config.iosRewardedUnitId}';
-    } else {
-      throw UnsupportedError('Unsupported mobile platform for AdMob');
-    }
+    if (Platform.isAndroid) return androidRewardedAdUnitId;
+    if (Platform.isIOS) return iosRewardedAdUnitId;
+    throw UnsupportedError('Unsupported mobile platform for AdMob');
   }
 
   static String get interstitialAdUnitId {
-    if (Platform.isAndroid) {
-      return '${config.androidInterstitialUnitId}';
-    } else if (Platform.isIOS) {
-      return '${config.iosInterstitialUnitId}';
-    } else {
-      throw UnsupportedError('Unsupported mobile platform for AdMob');
-    }
+    if (Platform.isAndroid) return androidInterstitialAdUnitId;
+    if (Platform.isIOS) return iosInterstitialAdUnitId;
+    throw UnsupportedError('Unsupported mobile platform for AdMob');
   }
 
   // ---------------------------------------------------------------------------
@@ -339,7 +334,7 @@ class AdHelper {
 export function generateMainDart(): string {
   return `// lib/main.dart
 // -----------------------------------------------------------------------------
-// Flutter Kids Drawing & Coloring App Entry Point
+// VibeSync Kids Drawing Toddler Paint Flutter App Entry Point
 // Google Play Families Policy Compliant AdMob Integration
 // -----------------------------------------------------------------------------
 
@@ -364,7 +359,7 @@ class KidsDrawingApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: "Kids Drawing Studio",
+      title: "VibeSync Kids Drawing Toddler Paint",
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -564,7 +559,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('🎨 Toddler Drawing Pad'),
+        title: const Text('🎨 VibeSync Kids Drawing'),
         elevation: 0,
         backgroundColor: Colors.amber[300],
         actions: [
@@ -787,7 +782,7 @@ export function generateAndroidManifestXml(appId: string): string {
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
     <application
-        android:label="Kids Drawing: Toddler Paint"
+        android:label="VibeSync Kids Drawing Toddler Paint"
         android:name="\${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
@@ -839,7 +834,7 @@ export function generateAndroidManifestXml(appId: string): string {
 export function generatePubspecYaml(): string {
   return `# pubspec.yaml
 name: kids_drawing_toddler_paint
-description: "Child-Safe Kids Drawing Studio with AdMob COPPA & Families Policy"
+description: "VibeSync Kids Drawing Toddler Paint with child-directed AdMob settings"
 publish_to: "none"
 version: 1.0.0+1
 
@@ -868,11 +863,11 @@ dev_dependencies:
 # Run: dart run flutter_launcher_icons
 # ==============================================================================
 flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: true
+  android: "ic_launcher"
+  ios: false
   image_path: "assets/icon/app_icon.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#FFFBEB"
+  adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
 
 flutter:
@@ -1168,10 +1163,20 @@ void main() {
       expect(request.extras!['npa'], equals('1'));
     });
 
-    test('Production AdMob IDs match verified format', () {
-      expect(AdHelper.bannerAdUnitId, startsWith('ca-app-pub-'));
-      expect(AdHelper.rewardedAdUnitId, startsWith('ca-app-pub-'));
-      expect(AdHelper.interstitialAdUnitId, startsWith('ca-app-pub-'));
+    test('Configured Android and iOS AdMob unit IDs have valid formats', () {
+      final ids = <String>[
+        AdHelper.androidBannerAdUnitId,
+        AdHelper.iosBannerAdUnitId,
+        AdHelper.androidRewardedAdUnitId,
+        AdHelper.iosRewardedAdUnitId,
+        AdHelper.androidInterstitialAdUnitId,
+        AdHelper.iosInterstitialAdUnitId,
+      ];
+      expect(ids, hasLength(6));
+      expect(ids.every((id) => id.startsWith('ca-app-pub-')), isTrue);
+      expect(AdHelper.androidBannerAdUnitId, equals('ca-app-pub-4783826505860771/2828860731'));
+      expect(AdHelper.androidRewardedAdUnitId, startsWith('ca-app-pub-3940256099942544/'));
+      expect(AdHelper.androidInterstitialAdUnitId, startsWith('ca-app-pub-3940256099942544/'));
     });
   });
 }

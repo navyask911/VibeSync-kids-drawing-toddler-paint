@@ -1,45 +1,47 @@
-# Kids Drawing: Toddler Paint
+# VibeSync Kids Drawing Toddler Paint
 
-A COPPA and Google Play Families compliant Flutter drawing application featuring child-safe monetization via Google Mobile Ads (AdMob), stroke protection, and parental gates.
+A small Flutter drawing app for toddlers. The Android application lives in `lib/` and `android/`; `src/` is a separate React/Vite developer dashboard and source-code generator.
 
----
+## Current app features
 
-## 🎨 Key Features
+- Freehand finger drawing on a canvas.
+- Six selectable brush colors and a clear-canvas action.
+- Bottom banner ad integration with a visual spacer separating the ad area from the canvas.
+- A randomized arithmetic parental gate before a rewarded-ad bonus-unlock attempt.
+- Child-directed AdMob request configuration, a G-rated content ceiling, under-age-of-consent flag and a non-personalized-ad request extra.
 
-- **Kid-Safe Canvas:** Smooth toddler finger painting, rainbow brushes, neon glow pens, and animal coloring templates.
-- **Stroke Suppression Sentinel:** Full-screen ads are strictly blocked while the child has their finger on the canvas to prevent interruptions.
-- **Physical Safe Buffer:** Bottom-anchored banner ads include a dedicated physical separation buffer to eliminate accidental toddler misclicks.
-- **Parental Gate Challenge:** Arithmetic verification (e.g., `4 + 3 = ?`) protects bonus coloring page unlocks, external links, and rewarded video ads.
+## Important current limitations
 
----
+- The four bonus entries are currently labels and unlock states, not finished coloring-page illustrations.
+- Brush color is currently applied by the painter to all stored strokes, so changing color can recolor previous strokes. Per-stroke color storage is still needed.
+- Drawings are held in memory only. Save/export, undo/redo, persistence and sharing are not implemented.
+- A wrong answer in the Flutter parental gate closes the dialog instead of offering another attempt.
+- The banner uses the configured app's banner ad unit. Rewarded and interstitial IDs in `lib/ad_helper.dart` are Google's test IDs; the interstitial helper is not currently called by the Flutter UI.
+- The ad settings are technical safeguards, not a certification or guarantee of COPPA, GDPR-K or Google Play Families Policy compliance. Verify the app's audience, consent/privacy disclosures, ad-network setup and ad placement in Play Console and AdMob before release.
 
-## 🛡️ Policy & COPPA Compliance
+## Repository map
 
-This application adheres to the **Google Play Families Policy**, **FTC COPPA**, and **GDPR-K**:
+| Path | Purpose |
+| --- | --- |
+| `lib/main.dart` | Flutter drawing screen and parental gate |
+| `lib/ad_helper.dart` | AdMob initialization, request flags and ad lifecycle helpers |
+| `android/` | Android manifest, launcher resources and release configuration |
+| `test/admob_coppa_test.dart` | Flutter unit tests for selected ad/request invariants |
+| `src/` | React/Vite developer dashboard, simulator and generated Flutter templates |
+| `.github/workflows/build-aab.yml` | Android App Bundle/APK build workflow |
 
-- **Child-Directed Flag:** `tagForChildDirectedTreatment: TagForChildDirectedTreatment.yes`
-- **Age Rating Ceiling:** `maxAdContentRating: MaxAdContentRating.g` (strictly G-rated ads)
-- **European Underage Protection:** `tagForUnderAgeOfConsent: TagForUnderAgeOfConsent.yes`
-- **Non-Personalized Ads (NPA):** All ad requests enforce `extras: {'npa': '1'}` with zero user profiling or tracking.
+The web dashboard contains simulated ad playback and illustrative test-status UI. It does not execute Flutter tests or inspect a built APK.
 
----
+## Build and test
 
-## 📂 Exported Flutter Artifacts
+Use a Flutter stable SDK and Java 17.
 
-The complete mobile source code generated from AI Studio is structured as:
+```sh
+flutter pub get
+dart run flutter_launcher_icons
+flutter test
+flutter analyze
+flutter build appbundle --release
+```
 
-| File | Purpose |
-| :--- | :--- |
-| `lib/ad_helper.dart` | AdMob singleton manager with COPPA RequestConfiguration |
-| `lib/main.dart` | Drawing pad UI, stroke sentinel, safe banner dock, & parental gate |
-| `android/app/src/main/AndroidManifest.xml` | Production AdMob Application ID configuration |
-| `android/app/build.gradle` | Release signing wiring and R8 code shrinking rules |
-| `android/app/proguard-rules.pro` | Google Mobile Ads R8 preservation rules |
-| `android/key.properties.example` | Keystore credentials template |
-| `pubspec.yaml` | Flutter dependencies and launcher icons configuration |
-| `test/admob_coppa_test.dart` | 12/12 automated unit and invariant test suite |
-| `COPPA_CHECKLIST.md` | Play Console Families audit checklist |
-
----
-
-
+The GitHub Actions workflow builds a release AAB and APK and uploads them as workflow artifacts. Release signing must use the intended upload keystore; do not publish an artifact that was signed with the debug key.
