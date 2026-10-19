@@ -463,6 +463,15 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
 
     final strings = AppLocalizations.of(context);
     if (!await _promptParentalGate() || !mounted) return;
+    if (!AdHelper.instance.hasRewardedAdConfigured) {
+      // Never ship Google's test ad IDs in release. Until a production rewarded
+      // unit is configured, parents can unlock the template without an ad.
+      setState(() => _unlockedPages.add(page));
+      _drawing.setSelectedPage(page);
+      _showMessage(strings.translate('bonus_unlocked_without_ad'));
+      return;
+    }
+
     if (_isOnline != true || !AdHelper.instance.isInitialized) {
       _showMessage(strings.translate('no_ad_ready'));
       return;

@@ -29,10 +29,30 @@ class AdHelper {
   // Rewarded/interstitial currently use official Google test units.
   static const String androidBannerAdUnitId = 'ca-app-pub-4783826505860771/2828860731';
   static const String iosBannerAdUnitId = 'ca-app-pub-4783826505860771/2828860731';
-  static const String androidRewardedAdUnitId = 'ca-app-pub-3940256099942544/5224354917';
-  static const String iosRewardedAdUnitId = 'ca-app-pub-3940256099942544/1712485313';
-  static const String androidInterstitialAdUnitId = 'ca-app-pub-3940256099942544/1033173712';
-  static const String iosInterstitialAdUnitId = 'ca-app-pub-3940256099942544/4411468910';
+  // Official test units are used only in debug builds. Configure the production
+  // units through --dart-define before enabling ads for those formats in release.
+  static const String androidRewardedTestAdUnitId = 'ca-app-pub-3940256099942544/5224354917';
+  static const String iosRewardedTestAdUnitId = 'ca-app-pub-3940256099942544/1712485313';
+  static const String androidInterstitialTestAdUnitId = 'ca-app-pub-3940256099942544/1033173712';
+  static const String iosInterstitialTestAdUnitId = 'ca-app-pub-3940256099942544/4411468910';
+
+  static const String _androidRewardedProductionAdUnitId =
+      String.fromEnvironment('ADMOB_REWARDED_ANDROID');
+  static const String _iosRewardedProductionAdUnitId =
+      String.fromEnvironment('ADMOB_REWARDED_IOS');
+  static const String _androidInterstitialProductionAdUnitId =
+      String.fromEnvironment('ADMOB_INTERSTITIAL_ANDROID');
+  static const String _iosInterstitialProductionAdUnitId =
+      String.fromEnvironment('ADMOB_INTERSTITIAL_IOS');
+
+  static String get androidRewardedAdUnitId =>
+      kDebugMode ? androidRewardedTestAdUnitId : _androidRewardedProductionAdUnitId;
+  static String get iosRewardedAdUnitId =>
+      kDebugMode ? iosRewardedTestAdUnitId : _iosRewardedProductionAdUnitId;
+  static String get androidInterstitialAdUnitId =>
+      kDebugMode ? androidInterstitialTestAdUnitId : _androidInterstitialProductionAdUnitId;
+  static String get iosInterstitialAdUnitId =>
+      kDebugMode ? iosInterstitialTestAdUnitId : _iosInterstitialProductionAdUnitId;
 
   static String get bannerAdUnitId {
     if (Platform.isAndroid) return androidBannerAdUnitId;
@@ -51,6 +71,9 @@ class AdHelper {
     if (Platform.isIOS) return iosInterstitialAdUnitId;
     throw UnsupportedError('Unsupported mobile platform for AdMob');
   }
+
+  bool get hasRewardedAdConfigured => rewardedAdUnitId.isNotEmpty;
+  bool get hasInterstitialAdConfigured => interstitialAdUnitId.isNotEmpty;
 
   // 2. COPPA & GOOGLE PLAY FAMILIES GLOBAL INITIALIZATION
   // ---------------------------------------------------------------------------
@@ -87,9 +110,10 @@ class AdHelper {
       });
     }
 
-    // Preload rewarded and interstitial ads ready for user triggers
-    loadRewardedAd();
-    loadInterstitialAd();
+    // Preload only formats with a configured unit ID. In release builds, test
+    // IDs are deliberately not substituted for missing production credentials.
+    if (hasRewardedAdConfigured) loadRewardedAd();
+    if (hasInterstitialAdConfigured) loadInterstitialAd();
   }
 
   // ---------------------------------------------------------------------------
@@ -142,7 +166,7 @@ class AdHelper {
   // ---------------------------------------------------------------------------
   /// Preloads a Rewarded Ad for unlocking bonus coloring sheets.
   void loadRewardedAd() {
-    if (_isRewardedAdLoading || _rewardedAd != null) return;
+    if (!hasRewardedAdConfigured || _isRewardedAdLoading || _rewardedAd != null) return;
     _isRewardedAdLoading = true;
 
     RewardedAd.load(
@@ -211,7 +235,11 @@ class AdHelper {
   // ---------------------------------------------------------------------------
   /// Preloads an Interstitial Ad for transitions between coloring albums.
   void loadInterstitialAd() {
-    if (_isInterstitialAdLoading || _interstitialAd != null) return;
+    if (!hasInterstitialAdConfigured ||
+        _isInterstitialAdLoading ||
+        _interstitialAd != null) {
+      return;
+    }
     _isInterstitialAdLoading = true;
 
     InterstitialAd.load(

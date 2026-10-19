@@ -72,16 +72,16 @@ void main() {
       final ids = <String>[
         AdHelper.androidBannerAdUnitId,
         AdHelper.iosBannerAdUnitId,
-        AdHelper.androidRewardedAdUnitId,
-        AdHelper.iosRewardedAdUnitId,
-        AdHelper.androidInterstitialAdUnitId,
-        AdHelper.iosInterstitialAdUnitId,
+        AdHelper.androidRewardedTestAdUnitId,
+        AdHelper.iosRewardedTestAdUnitId,
+        AdHelper.androidInterstitialTestAdUnitId,
+        AdHelper.iosInterstitialTestAdUnitId,
       ];
       expect(ids, hasLength(6));
       expect(ids.every((id) => id.startsWith('ca-app-pub-')), isTrue);
       expect(AdHelper.androidBannerAdUnitId, equals('ca-app-pub-4783826505860771/2828860731'));
-      expect(AdHelper.androidRewardedAdUnitId, startsWith('ca-app-pub-3940256099942544/'));
-      expect(AdHelper.androidInterstitialAdUnitId, startsWith('ca-app-pub-3940256099942544/'));
+      expect(AdHelper.androidRewardedTestAdUnitId, startsWith('ca-app-pub-3940256099942544/'));
+      expect(AdHelper.androidInterstitialTestAdUnitId, startsWith('ca-app-pub-3940256099942544/'));
     });
   });
 }

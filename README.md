@@ -32,7 +32,7 @@ Replace the example with the actual creator-owned support URL before release. Wi
 
 ## Advertising and child safety
 
-The app applies child-directed AdMob request settings and keeps the banner isolated from the drawing canvas. The rewarded/interstitial unit identifiers remain test IDs unless explicitly configured otherwise. A configuration flag is not a certification: verify the current Google Play Families policies, ad SDK eligibility, app content, privacy notice and Play Console declarations before release.
+The app applies child-directed AdMob request settings and keeps the banner isolated from the drawing canvas. Rewarded/interstitial test IDs are used only in debug builds. Release builds do not load those formats unless production IDs are configured with `--dart-define=ADMOB_REWARDED_ANDROID=...` and/or `--dart-define=ADMOB_INTERSTITIAL_ANDROID=...` (use corresponding `_IOS` values for iOS). Without a production rewarded ID, locked coloring pages can be unlocked after parent approval without an ad. A configuration flag is not a certification: verify the current Google Play Families policies, ad SDK eligibility, app content, privacy notice and Play Console declarations before release.
 
 ## Build and verification
 
