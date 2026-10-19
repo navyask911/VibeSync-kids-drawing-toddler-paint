@@ -56,10 +56,15 @@ class DrawingPersistence {
 
     final snapshot = <String, Object?>{
       'version': _version,
+      // ignore: deprecated_member_use
       'backgroundColor': controller.backgroundColor.value,
+      // ignore: deprecated_member_use
       'brushColor': controller.brushColor.value,
+      // ignore: deprecated_member_use
       'bucketColor': controller.bucketColor.value,
+      // ignore: deprecated_member_use
       'stampFillColor': controller.stampFillColor.value,
+      // ignore: deprecated_member_use
       'stampStrokeColor': controller.stampStrokeColor.value,
       'brushWidth': controller.brushWidth,
       'brushStyle': controller.brushStyle.name,
@@ -90,6 +95,7 @@ class DrawingPersistence {
   Map<String, Object?> _encodeStroke(AdvancedStroke stroke) => <String, Object?>{
         'points': stroke.points.map((p) => <double>[p.dx, p.dy]).toList(growable: false),
         'style': stroke.style.name,
+        // ignore: deprecated_member_use
         'color': stroke.color.value,
         'width': stroke.width,
         'order': stroke.order,
@@ -101,7 +107,9 @@ class DrawingPersistence {
         'y': stamp.position.dy,
         'scale': stamp.scale,
         'rotation': stamp.rotationAngle,
+        // ignore: deprecated_member_use
         'fillColor': stamp.fillColor.value,
+        // ignore: deprecated_member_use
         'strokeColor': stamp.strokeColor.value,
         'layerCategory': stamp.layerCategory.name,
         'order': stamp.order,
