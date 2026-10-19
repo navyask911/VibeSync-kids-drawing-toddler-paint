@@ -156,6 +156,7 @@ void _drawStroke(Canvas canvas, AdvancedStroke stroke) {
           ..strokeWidth = stroke.width * 2.8
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round
+          // ignore: deprecated_member_use
           ..color = stroke.color.withOpacity(0.85),
       );
       canvas.restore();
@@ -163,6 +164,7 @@ void _drawStroke(Canvas canvas, AdvancedStroke stroke) {
         path,
         basePaint
           ..strokeWidth = math.max(1.0, stroke.width * 0.48).toDouble()
+          // ignore: deprecated_member_use
           ..color = Colors.white.withOpacity(0.95),
       );
       canvas.restore();
@@ -225,6 +227,7 @@ void _drawStamp(Canvas canvas, CanvasStamp stamp) {
         math.pi * 0.8,
         false,
         Paint()
+          // ignore: deprecated_member_use
           ..color = Colors.white.withOpacity(0.7)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2,

@@ -718,7 +718,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: FilterChip(
                         avatar: Icon(_selectingStampOutline ? Icons.border_color : Icons.format_color_fill, size: 16),
-                        label: Text(_selectingStampOutline ? 'Outline' : 'Fill'),
+                        label: Text(strings.translate(_selectingStampOutline ? 'stamp_outline' : 'stamp_fill')),
                         selected: _selectingStampOutline,
                         onSelected: (value) => setState(() => _selectingStampOutline = value),
                       ),

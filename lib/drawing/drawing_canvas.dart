@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -114,10 +113,15 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
           'height': height,
           'seedX': seedX,
           'seedY': seedY,
-          'red': (color.r * 255).round(),
-          'green': (color.g * 255).round(),
-          'blue': (color.b * 255).round(),
-          'alpha': (color.a * 255).round(),
+          // Keep compatibility with the Flutter 3.10 minimum declared in pubspec.
+          // ignore: deprecated_member_use
+          'red': color.red,
+          // ignore: deprecated_member_use
+          'green': color.green,
+          // ignore: deprecated_member_use
+          'blue': color.blue,
+          // ignore: deprecated_member_use
+          'alpha': color.alpha,
           'tolerance': 18,
           'maxPixels': DrawingController.maxRasterPixels,
         },
