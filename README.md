@@ -9,6 +9,7 @@ A child-friendly Flutter drawing application with freehand drawing, brush styles
 - `lib/drawing/drawing_models.dart`: typed strokes, stamps, layers and coloring-page types.
 - `lib/drawing/drawing_painters.dart`: background/template/stamp/stroke painter layers with neon and rainbow styles.
 - `lib/drawing/drawing_canvas.dart`: pointer handling, asynchronous raster fill and parent-gated PNG sharing.
+- `lib/drawing/drawing_persistence.dart`: bounded local autosave/restore of strokes, stamps, palette and raster fill layers.
 - `lib/drawing/flood_fill.dart`: bounded non-recursive RGBA flood-fill algorithm that runs through Flutter's compute isolate.
 - `lib/l10n/app_localizations.dart`: initial English, Spanish, Hindi, Chinese, German and French strings.
 - `lib/ad_helper.dart`: existing AdMob request configuration and ad lifecycle helper.

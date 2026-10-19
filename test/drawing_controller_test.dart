@@ -71,6 +71,52 @@ void main() {
       expect(controller.stamps, isEmpty);
     });
 
+
+    test('restoring a snapshot preserves artwork as the new session baseline', () {
+      final savedStroke = AdvancedStroke(
+        points: const <Offset>[Offset(2, 3), Offset(9, 10)],
+        style: StrokeStyle.rainbow,
+        color: Colors.purple,
+        width: 7,
+        order: 14,
+      );
+      final savedStamp = CanvasStamp(
+        kind: StampKind.fish,
+        position: const Offset(45, 50),
+        scale: 0.9,
+        rotationAngle: 0.2,
+        fillColor: Colors.orange,
+        strokeColor: Colors.brown,
+        layerCategory: LayerCategory.foregroundFlora,
+        order: 15,
+      );
+
+      controller.restoreSnapshot(
+        strokes: <AdvancedStroke>[savedStroke],
+        stamps: <CanvasStamp>[savedStamp],
+        fills: const <CanvasFill>[],
+        restoredBackgroundColor: Colors.lightBlue,
+        restoredBrushColor: Colors.red,
+        restoredBucketColor: Colors.green,
+        restoredStampFillColor: Colors.yellow,
+        restoredStampStrokeColor: Colors.black,
+        restoredBrushWidth: 8,
+        restoredBrushStyle: StrokeStyle.neon,
+        restoredActiveTool: ActiveTool.stamp,
+        restoredSelectedStamp: StampKind.fish,
+        restoredSelectedPage: ColoringPage.puppy,
+      );
+
+      expect(controller.strokes.single.color, Colors.purple);
+      expect(controller.stamps.single.kind, StampKind.fish);
+      expect(controller.backgroundColor, Colors.lightBlue);
+      expect(controller.brushStyle, StrokeStyle.neon);
+      expect(controller.activeTool, ActiveTool.stamp);
+      expect(controller.selectedPage, ColoringPage.puppy);
+      expect(controller.canUndo, isFalse);
+      expect(controller.canRedo, isFalse);
+    });
+
     test('a new edit after undo clears redo history', () {
       controller.beginStroke(const Offset(0, 0));
       controller.appendActivePoint(const Offset(1, 1));

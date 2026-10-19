@@ -17,6 +17,7 @@ import 'ad_helper.dart';
 import 'drawing/drawing_canvas.dart';
 import 'drawing/drawing_controller.dart';
 import 'drawing/drawing_models.dart';
+import 'drawing/drawing_persistence.dart';
 import 'drawing/drawing_painters.dart';
 import 'l10n/app_localizations.dart';
 
@@ -83,6 +84,11 @@ class DrawingStudioScreen extends StatefulWidget {
 class _DrawingStudioScreenState extends State<DrawingStudioScreen>
     with WidgetsBindingObserver {
   final DrawingController _drawing = DrawingController();
+  final DrawingPersistence _persistence = DrawingPersistence();
+  Timer? _autosaveTimer;
+  bool _restoringDrawing = true;
+  bool _autosaveInProgress = false;
+  bool _autosaveAgain = false;
   final GlobalKey _canvasKey = GlobalKey();
   final Set<ColoringPage> _unlockedPages = <ColoringPage>{
     ColoringPage.puppy,
@@ -105,6 +111,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(_restoreLocalDrawing());
     _listenForInternet();
     if (defaultTargetPlatform == TargetPlatform.android) {
       _updateSubscription = InAppUpdate.installUpdateListener.listen(
@@ -112,6 +119,48 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
         onError: (Object error) =>
             debugPrint('In-app update listener unavailable: $error'),
       );
+    }
+  }
+
+
+  Future<void> _restoreLocalDrawing() async {
+    try {
+      await _persistence.restore(_drawing);
+    } catch (error, stackTrace) {
+      // A damaged or outdated local file must never block the drawing app.
+      debugPrint('Local drawing restore skipped: $error\\n$stackTrace');
+    }
+    if (!mounted) return;
+    _drawing.addListener(_onDrawingChanged);
+    setState(() => _restoringDrawing = false);
+  }
+
+  void _onDrawingChanged() {
+    if (_restoringDrawing || !mounted) return;
+    _autosaveTimer?.cancel();
+    _autosaveTimer = Timer(const Duration(milliseconds: 900), () {
+      unawaited(_saveDrawing());
+    });
+  }
+
+  Future<void> _saveDrawing() async {
+    if (_restoringDrawing) return;
+    if (_autosaveInProgress) {
+      _autosaveAgain = true;
+      return;
+    }
+    _autosaveInProgress = true;
+    try {
+      do {
+        _autosaveAgain = false;
+        try {
+          await _persistence.save(_drawing);
+        } catch (error) {
+          debugPrint('Local drawing autosave skipped: $error');
+        }
+      } while (_autosaveAgain && mounted);
+    } finally {
+      _autosaveInProgress = false;
     }
   }
 
@@ -191,6 +240,10 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      _autosaveTimer?.cancel();
+      unawaited(_saveDrawing());
+    }
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshInternetStatus());
       if (_isOnline == true) {
@@ -980,7 +1033,10 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
         ],
       ),
       body: SafeArea(
-        child: Column(
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            Column(
           children: <Widget>[
             if (_isOnline == false) _buildOfflineBanner(strings),
             if (_isOnline == true && _updateAvailable) _buildUpdateBanner(strings),
@@ -1041,6 +1097,25 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
               ),
             ),
             _buildAdDock(strings),
+            ],
+            if (_restoringDrawing)
+              Positioned.fill(
+                child: AbsorbPointer(
+                  child: ColoredBox(
+                    color: Color(0xCCFFFFFB),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          const CircularProgressIndicator.adaptive(),
+                          const SizedBox(height: 12),
+                          Text(strings.translate('restoring_artwork')),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -1050,10 +1125,25 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _autosaveTimer?.cancel();
+    _drawing.removeListener(_onDrawingChanged);
+    if (!_restoringDrawing) {
+      // Keep native images alive until the final local snapshot completes.
+      unawaited(
+        _persistence.save(_drawing).then<void>(
+          (_) => _drawing.dispose(),
+          onError: (Object error, StackTrace stackTrace) {
+            debugPrint('Final local drawing save skipped: $error');
+            _drawing.dispose();
+          },
+        ),
+      );
+    } else {
+      _drawing.dispose();
+    }
     _internetSubscription?.cancel();
     _updateSubscription?.cancel();
     _bannerAd?.dispose();
-    _drawing.dispose();
     super.dispose();
   }
 }

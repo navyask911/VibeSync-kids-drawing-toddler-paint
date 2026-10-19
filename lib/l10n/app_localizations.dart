@@ -22,6 +22,7 @@ class AppLocalizations {
       <String, Map<String, String>>{
     'en': <String, String>{
       'app_title': 'VibeSync Kids Drawing Toddler Paint',
+      'restoring_artwork': 'Restoring your last drawing…',
       'tool_brush': 'Magic Brush',
       'tool_bucket': 'Paint Bucket',
       'tool_stamp': 'Sticker Tool',
@@ -90,6 +91,7 @@ class AppLocalizations {
     },
     'es': <String, String>{
       'app_title': 'VibeSync Dibujo Infantil',
+      'restoring_artwork': 'Restaurando tu último dibujo…',
       'tool_brush': 'Pincel mágico',
       'tool_bucket': 'Cubo de pintura',
       'tool_stamp': 'Pegatinas',
@@ -158,6 +160,7 @@ class AppLocalizations {
     },
     'hi': <String, String>{
       'app_title': 'VibeSync बच्चों की ड्रॉइंग',
+      'restoring_artwork': 'आपका पिछला चित्र वापस लाया जा रहा है…',
       'tool_brush': 'जादुई ब्रश',
       'tool_bucket': 'रंग भरने की बाल्टी',
       'tool_stamp': 'स्टिकर टूल',
@@ -226,6 +229,7 @@ class AppLocalizations {
     },
     'zh': <String, String>{
       'app_title': 'VibeSync 儿童绘画',
+      'restoring_artwork': '正在恢复上次的画作…',
       'tool_brush': '魔法画笔',
       'tool_bucket': '油漆桶',
       'tool_stamp': '贴纸工具',
@@ -294,6 +298,7 @@ class AppLocalizations {
     },
     'de': <String, String>{
       'app_title': 'VibeSync Kinder-Malstudio',
+      'restoring_artwork': 'Deine letzte Zeichnung wird wiederhergestellt…',
       'tool_brush': 'Zauberpinsel',
       'tool_bucket': 'Farbeimer',
       'tool_stamp': 'Sticker-Werkzeug',
@@ -362,6 +367,7 @@ class AppLocalizations {
     },
     'fr': <String, String>{
       'app_title': 'VibeSync Dessin pour enfants',
+      'restoring_artwork': 'Restauration de votre dernier dessin…',
       'tool_brush': 'Pinceau magique',
       'tool_bucket': 'Pot de peinture',
       'tool_stamp': 'Autocollants',

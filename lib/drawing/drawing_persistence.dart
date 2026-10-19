@@ -276,7 +276,7 @@ class DrawingPersistence {
 
   int _readColor(Object? value, int fallback) {
     final color = _readInt(value, fallback);
-    return color.clamp(0, 0xFFFFFFFF);
+    return color.clamp(0, 0xFFFFFFFF).toInt();
   }
 
   double _readDouble(Object? value, double fallback) {
