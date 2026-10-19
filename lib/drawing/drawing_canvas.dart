@@ -85,15 +85,8 @@ class _DrawingPainter extends CustomPainter {
       _paintStroke(canvas, stroke);
     }
 
-    final points = controller.activePoints;
-    if (points.isNotEmpty && controller.isDrawing) {
-      _paintStroke(canvas, AdvancedStroke(
-        points: List<Offset>.from(points),
-        style: controller.brushStyle,
-        color: controller.brushColor,
-        width: controller.brushWidth,
-      ));
-    }
+    final activeStroke = controller.activeStroke;
+    if (activeStroke != null) _paintStroke(canvas, activeStroke);
     canvas.restore();
   }
 

@@ -421,7 +421,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
         ],
       ),
     );
-    if (confirmed == true) _drawing.clearCanvas();
+    if (confirmed == true) setState(_drawing.clearCanvas);
   }
 
   void _unlockWithRewardedAd(StampKind kind) {

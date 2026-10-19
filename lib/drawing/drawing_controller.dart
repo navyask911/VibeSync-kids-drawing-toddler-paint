@@ -58,6 +58,18 @@ class DrawingController extends ChangeNotifier {
   StampKind get selectedStamp => _selectedStamp;
   bool get isDrawing => _isDrawing;
   List<Offset> get activePoints => _activePoints;
+
+  /// Immutable snapshot of the active gesture, preserving the brush settings
+  /// captured at pointer-down even if another state update happens mid-gesture.
+  AdvancedStroke? get activeStroke {
+    if (!_isDrawing || _activePoints.isEmpty) return null;
+    return AdvancedStroke(
+      points: List<Offset>.from(_activePoints),
+      style: _activeStrokeStyle,
+      color: _activeStrokeColor,
+      width: _activeStrokeWidth,
+    );
+  }
   bool get canUndo => _undo.isNotEmpty;
   bool get canRedo => _redo.isNotEmpty;
 

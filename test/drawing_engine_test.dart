@@ -81,7 +81,7 @@ void main() {
       final restored = AdvancedStroke.fromJson(source.toJson());
       expect(restored.points, source.points);
       expect(restored.style, source.style);
-      expect(restored.color, source.color);
+      expect(restored.color.value, source.color.value);
       expect(restored.width, source.width);
     });
   });

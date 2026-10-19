@@ -36,6 +36,9 @@ jobs:
       - name: Run Flutter unit tests
         run: flutter test
 
+      - name: Run Dart static analysis
+        run: flutter analyze
+
       - name: Configure Release Keystore from Repository Secrets
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
@@ -49,8 +52,8 @@ jobs:
 
       - name: Build Android App Bundle (AAB) & APK
         run: |
-          flutter build appbundle --release --android-skip-build-dependency-validation
-          flutter build apk --release --android-skip-build-dependency-validation
+          flutter build appbundle --release --android-skip-build-dependency-validation --dart-define=VIBESYNC_SUPPORT_URL=${{ vars.VIBESYNC_SUPPORT_URL }}
+          flutter build apk --release --android-skip-build-dependency-validation --dart-define=VIBESYNC_SUPPORT_URL=${{ vars.VIBESYNC_SUPPORT_URL }}
 
       - name: Upload Release Artifacts
         uses: actions/upload-artifact@v4
