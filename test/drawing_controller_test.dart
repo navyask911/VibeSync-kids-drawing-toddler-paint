@@ -26,6 +26,15 @@ void main() {
       ]);
     });
 
+    test('an active stroke keeps its starting brush configuration', () {
+      controller.setBrushColor(Colors.red);
+      controller.beginStroke(const Offset(1, 1));
+      controller.setBrushColor(Colors.blue);
+      controller.finishStroke();
+
+      expect(controller.strokes.single.color, Colors.red);
+    });
+
     test('undo and redo restore stroke geometry', () {
       controller.beginStroke(const Offset(1, 2));
       controller.appendActivePoint(const Offset(10, 20));

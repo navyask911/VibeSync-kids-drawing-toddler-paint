@@ -49,9 +49,9 @@ class ActiveStrokePainter extends CustomPainter {
       canvas,
       AdvancedStroke(
         points: points,
-        color: controller.brushColor,
-        width: controller.brushWidth,
-        style: controller.brushStyle,
+        color: controller.activeStrokeColor,
+        width: controller.activeStrokeWidth,
+        style: controller.activeStrokeStyle,
       ),
     );
   }

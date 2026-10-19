@@ -90,6 +90,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
   bool _checkingUpdate = false;
   bool _updateAvailable = false;
   bool _updateDownloading = false;
+  bool _selectingStampOutline = false;
   AppUpdateInfo? _updateInfo;
   StreamSubscription<InternetStatus>? _internetSubscription;
   StreamSubscription<InstallStatus>? _updateSubscription;
@@ -679,7 +680,11 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                                 _drawing.setBucketColor(color);
                                 break;
                               case ActiveTool.stamp:
-                                _drawing.setStampColors(fill: color);
+                                if (_selectingStampOutline) {
+                                  _drawing.setStampColors(stroke: color);
+                                } else {
+                                  _drawing.setStampColors(fill: color);
+                                }
                                 break;
                             }
                           },
@@ -696,7 +701,9 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                                         (_drawing.activeTool == ActiveTool.paintBucket &&
                                             _drawing.bucketColor == color) ||
                                         (_drawing.activeTool == ActiveTool.stamp &&
-                                            _drawing.stampFillColor == color)
+                                            (_selectingStampOutline
+                                                ? _drawing.stampStrokeColor == color
+                                                : _drawing.stampFillColor == color))
                                     ? Colors.black
                                     : Colors.black12,
                                 width: 3,
@@ -704,6 +711,16 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                             ),
                           ),
                         ),
+                      ),
+                    ),
+                  if (_drawing.activeTool == ActiveTool.stamp)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: FilterChip(
+                        avatar: Icon(_selectingStampOutline ? Icons.border_color : Icons.format_color_fill, size: 16),
+                        label: Text(_selectingStampOutline ? 'Outline' : 'Fill'),
+                        selected: _selectingStampOutline,
+                        onSelected: (value) => setState(() => _selectingStampOutline = value),
                       ),
                     ),
                   const SizedBox(width: 6),
@@ -914,22 +931,22 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                 child: Row(
                   children: <Widget>[
-                  IconButton(
-                    tooltip: strings.translate('undo'),
-                    onPressed: _drawing.canUndo ? _drawing.undo : null,
-                    icon: const Icon(Icons.undo),
-                  ),
-                  IconButton(
-                    tooltip: strings.translate('redo'),
-                    onPressed: _drawing.canRedo ? _drawing.redo : null,
-                    icon: const Icon(Icons.redo),
-                  ),
-                  const Spacer(),
-                  FilledButton.tonalIcon(
-                    onPressed: _confirmClear,
-                    icon: const Icon(Icons.delete_outline, size: 18),
+                    IconButton(
+                      tooltip: strings.translate('undo'),
+                      onPressed: _drawing.canUndo ? _drawing.undo : null,
+                      icon: const Icon(Icons.undo),
+                    ),
+                    IconButton(
+                      tooltip: strings.translate('redo'),
+                      onPressed: _drawing.canRedo ? _drawing.redo : null,
+                      icon: const Icon(Icons.redo),
+                    ),
+                    const Spacer(),
+                    FilledButton.tonalIcon(
+                      onPressed: _confirmClear,
+                      icon: const Icon(Icons.delete_outline, size: 18),
                       label: Text(strings.translate('clear')),
-                  ),
+                    ),
                   ],
                 ),
               ),

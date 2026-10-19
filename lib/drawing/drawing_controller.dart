@@ -9,6 +9,8 @@ abstract class _DrawingCommand {
   void redo(DrawingController controller);
   void undo(DrawingController controller);
 
+  bool get affectsBackground => false;
+  bool get affectsScene => true;
   Iterable<ui.Image> get referencedImages => const <ui.Image>[];
 }
 
@@ -44,6 +46,12 @@ class _BackgroundCommand extends _DrawingCommand {
 
   @override
   void undo(DrawingController controller) => controller.backgroundColor = before;
+
+  @override
+  bool get affectsBackground => true;
+
+  @override
+  bool get affectsScene => false;
 }
 
 class _TemplateCommand extends _DrawingCommand {
@@ -56,6 +64,12 @@ class _TemplateCommand extends _DrawingCommand {
 
   @override
   void undo(DrawingController controller) => controller.selectedPage = before;
+
+  @override
+  bool get affectsBackground => true;
+
+  @override
+  bool get affectsScene => false;
 }
 
 class _AddFillCommand extends _DrawingCommand {
@@ -67,6 +81,12 @@ class _AddFillCommand extends _DrawingCommand {
 
   @override
   void undo(DrawingController controller) => controller._fills.remove(fill);
+
+  @override
+  bool get affectsBackground => true;
+
+  @override
+  bool get affectsScene => false;
 
   @override
   Iterable<ui.Image> get referencedImages => <ui.Image>[fill.image];
@@ -103,6 +123,9 @@ class _ClearCommand extends _DrawingCommand {
   }
 
   @override
+  bool get affectsBackground => true;
+
+  @override
   Iterable<ui.Image> get referencedImages =>
       oldFills.map((fill) => fill.image);
 }
@@ -124,6 +147,9 @@ class DrawingController extends ChangeNotifier {
   final ChangeNotifier activeRepaint = ChangeNotifier();
 
   List<Offset>? _activePoints;
+  Color _activeStrokeColor = const Color(0xFFE64A19);
+  double _activeStrokeWidth = 6;
+  StrokeStyle _activeStrokeStyle = StrokeStyle.solid;
   int _nextOrder = 0;
 
   Color backgroundColor = const Color(0xFFFFFFFF);
@@ -147,6 +173,9 @@ class DrawingController extends ChangeNotifier {
   bool get canUndo => _undoStack.isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
   bool get hasActiveStroke => _activePoints != null;
+  Color get activeStrokeColor => _activeStrokeColor;
+  double get activeStrokeWidth => _activeStrokeWidth;
+  StrokeStyle get activeStrokeStyle => _activeStrokeStyle;
 
   void setActiveTool(ActiveTool value) {
     if (activeTool == value) return;
@@ -194,6 +223,9 @@ class DrawingController extends ChangeNotifier {
   void beginStroke(Offset point) {
     if (activeTool != ActiveTool.brush) return;
     _activePoints = <Offset>[point];
+    _activeStrokeColor = brushColor;
+    _activeStrokeWidth = brushWidth;
+    _activeStrokeStyle = brushStyle;
     activeRepaint.notifyListeners();
   }
 
@@ -212,9 +244,9 @@ class DrawingController extends ChangeNotifier {
     if (active.isNotEmpty) {
       _execute(_AddStrokeCommand(AdvancedStroke(
         points: active,
-        style: brushStyle,
-        color: brushColor,
-        width: brushWidth,
+        style: _activeStrokeStyle,
+        color: _activeStrokeColor,
+        width: _activeStrokeWidth,
         order: _nextOrder++,
       )));
     } else {
@@ -290,7 +322,7 @@ class DrawingController extends ChangeNotifier {
     command.undo(this);
     _redoStack.add(command);
     _pruneOwnedImages();
-    _notifyAllLayers();
+    _notifyForCommand(command);
     return true;
   }
 
@@ -300,7 +332,7 @@ class DrawingController extends ChangeNotifier {
     command.redo(this);
     _undoStack.add(command);
     _pruneOwnedImages();
-    _notifyAllLayers();
+    _notifyForCommand(command);
     return true;
   }
 
@@ -312,13 +344,14 @@ class DrawingController extends ChangeNotifier {
       _undoStack.removeAt(0);
     }
     _pruneOwnedImages();
-    _notifyAllLayers();
+    _notifyForCommand(command);
   }
 
-  void _notifyAllLayers() {
+  void _notifyForCommand(_DrawingCommand command) {
     notifyListeners();
-    backgroundRepaint.notifyListeners();
-    sceneRepaint.notifyListeners();
+    if (command.affectsBackground) backgroundRepaint.notifyListeners();
+    if (command.affectsScene) sceneRepaint.notifyListeners();
+    // A committed stroke must clear the temporary active-stroke layer.
     activeRepaint.notifyListeners();
   }
 

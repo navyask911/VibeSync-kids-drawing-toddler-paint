@@ -1,4 +1,3 @@
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kids_drawing_toddler_paint/l10n/app_localizations.dart';
 
