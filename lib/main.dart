@@ -1098,6 +1098,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
             ),
             _buildAdDock(strings),
             ],
+            ),
             if (_restoringDrawing)
               Positioned.fill(
                 child: AbsorbPointer(
