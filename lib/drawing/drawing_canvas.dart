@@ -75,12 +75,18 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     }
   }
 
+  Future<ui.Image> _decodeImageFromList(Uint8List encoded) {
+    final completer = Completer<ui.Image>();
+    ui.decodeImageFromList(encoded, completer.complete);
+    return completer.future;
+  }
+
   Future<void> _loadFillImage(CanvasFillLayer layer) async {
     final id = layer.id;
     final generation = _fillGeneration;
     final operation = () async {
       try {
-        final image = await ui.decodeImageFromList(Uint8List.fromList(layer.pngBytes));
+        final image = await _decodeImageFromList(Uint8List.fromList(layer.pngBytes));
         final stillExists = widget.controller.fills.any((item) => item.id == id);
         if (!mounted || generation != _fillGeneration || !stillExists) {
           image.dispose();
