@@ -38,3 +38,7 @@ flutter build appbundle --release --dart-define=VIBESYNC_SUPPORT_URL=https://you
 \`\`\`
 
 GitHub Actions builds an AAB and APK, runs tests and static analysis, and uploads artifacts. Verify release signing, install on real devices, and test Play Store in-app updates through a Play testing track before publishing.
+
+## Android release versioning
+
+This release candidate uses version name `1.0.1` and build/version code `20261019` (from `version: 1.0.1+20261019` in `pubspec.yaml`). The AAB and APK from the same release use the same version code. Before preparing a later Play Store release, increment both the version name as appropriate and the numeric value after `+`. GitHub Actions verifies that a release candidate's code is higher than the code on its base revision and blocks accidental reuse of an old code.

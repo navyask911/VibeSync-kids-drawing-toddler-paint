@@ -14,6 +14,39 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify Android version code increases from base
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+        run: |
+          CURRENT_VERSION="$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\"')"
+          CURRENT_CODE="${CURRENT_VERSION##*+}"
+          if [[ ! "$CURRENT_CODE" =~ ^[0-9]+$ ]] || (( CURRENT_CODE <= 1 )); then
+            echo "::error::pubspec.yaml must use a numeric Android build number greater than 1."
+            exit 1
+          fi
+          if [[ -n "$PR_BASE_SHA" ]]; then
+            BASE_SHA="$PR_BASE_SHA"
+          elif [[ -n "$PUSH_BASE_SHA" && "$PUSH_BASE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            BASE_SHA="$PUSH_BASE_SHA"
+          else
+            BASE_SHA="$(git rev-parse HEAD^)"
+          fi
+          BASE_VERSION="$(git show "$BASE_SHA:pubspec.yaml" | sed -n 's/^version: *//p' | tr -d '\"')"
+          BASE_CODE="${BASE_VERSION##*+}"
+          if [[ ! "$BASE_CODE" =~ ^[0-9]+$ ]]; then
+            echo "::error::Could not read a numeric base version code from pubspec.yaml."
+            exit 1
+          fi
+          echo "Base version code: $BASE_CODE"
+          echo "Candidate version code: $CURRENT_CODE"
+          if (( CURRENT_CODE <= BASE_CODE )); then
+            echo "::error::Version code must increase for each release candidate. Bump the +build number in pubspec.yaml."
+            exit 1
+          fi
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -36,8 +69,8 @@ jobs:
       - name: Run Flutter unit tests
         run: flutter test
 
-      - name: Run Dart static analysis
-        run: flutter analyze
+      - name: Run Dart static analysis (fail on warnings and errors)
+        run: flutter analyze --no-fatal-infos
 
       - name: Configure Release Keystore from Repository Secrets
         run: |
