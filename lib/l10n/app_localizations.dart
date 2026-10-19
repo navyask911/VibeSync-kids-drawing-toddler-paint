@@ -88,6 +88,7 @@ class AppLocalizations {
       'color_purple': 'Purple',
       'color_pink': 'Pink',
       'color_white': 'White',
+      'color_black': 'Black',
     },
     'es': <String, String>{
       'app_title': 'VibeSync Dibujo Infantil',
@@ -157,6 +158,7 @@ class AppLocalizations {
       'color_purple': 'Morado',
       'color_pink': 'Rosa',
       'color_white': 'Blanco',
+      'color_black': 'Negro',
     },
     'hi': <String, String>{
       'app_title': 'VibeSync बच्चों की ड्रॉइंग',
@@ -226,6 +228,7 @@ class AppLocalizations {
       'color_purple': 'बैंगनी',
       'color_pink': 'गुलाबी',
       'color_white': 'सफ़ेद',
+      'color_black': 'काला',
     },
     'zh': <String, String>{
       'app_title': 'VibeSync 儿童绘画',
@@ -295,6 +298,7 @@ class AppLocalizations {
       'color_purple': '紫色',
       'color_pink': '粉色',
       'color_white': '白色',
+      'color_black': '黑色',
     },
     'de': <String, String>{
       'app_title': 'VibeSync Kinder-Malstudio',
@@ -364,6 +368,7 @@ class AppLocalizations {
       'color_purple': 'Lila',
       'color_pink': 'Rosa',
       'color_white': 'Weiß',
+      'color_black': 'Schwarz',
     },
     'fr': <String, String>{
       'app_title': 'VibeSync Dessin pour enfants',
@@ -433,6 +438,7 @@ class AppLocalizations {
       'color_purple': 'Violet',
       'color_pink': 'Rose',
       'color_white': 'Blanc',
+      'color_black': 'Noir',
     },
   };
 

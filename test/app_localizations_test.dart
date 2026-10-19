@@ -10,6 +10,8 @@ void main() {
         'tool_brush',
         'tool_bucket',
         'tool_stamp',
+        'color_black',
+        'restoring_artwork',
         'bg_change',
         'stamp_house',
         'stamp_flower',

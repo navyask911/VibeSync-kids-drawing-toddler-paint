@@ -282,6 +282,8 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
   Future<void> _startUpdate() async {
     final info = _updateInfo;
     if (info == null) return;
+    // Starting the Play Store update is an external action in this child-directed app.
+    if (!await _promptParentalGate() || !mounted) return;
     try {
       if (info.flexibleUpdateAllowed) {
         await InAppUpdate.startFlexibleUpdate();
@@ -804,7 +806,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                                                 ? strings.translate('color_purple')
                                                 : color == palette[6]
                                                     ? strings.translate('color_pink')
-                                                    : strings.translate('color_white'),
+                                                    : strings.translate('color_black'),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(24),
                           onTap: () {
