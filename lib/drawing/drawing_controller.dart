@@ -3,7 +3,6 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -14,7 +13,6 @@ import 'drawing_models.dart';
 class DrawingController extends ChangeNotifier {
   DrawingController({this.persistenceEnabled = true});
 
-  static const _storageKey = 'vibesync_drawing_document_v1';
   static const maxHistoryEntries = 100;
 
   final bool persistenceEnabled;
