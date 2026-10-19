@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'drawing_models.dart';
 
@@ -44,7 +45,9 @@ class DrawingController extends ChangeNotifier {
   int _documentRevision = 0;
   int _nextStampOrder = 0;
   Timer? _persistTimer;
-  SharedPreferences? _prefs;
+  File? _documentFile;
+  Future<void> _writeQueue = Future<void>.value();
+  bool _userEditedDuringRestore = false;
 
   int get revision => _revision;
   Color get backgroundColor => _backgroundColor;
@@ -127,6 +130,7 @@ class DrawingController extends ChangeNotifier {
     if (_activeTool != ActiveTool.brush || _isDrawing) return;
     _isDrawing = true;
     _activePoints..clear()..add(point);
+    _userEditedDuringRestore = true;
     _activeStrokeColor = _brushColor;
     _activeStrokeStyle = _brushStyle;
     _activeStrokeWidth = _brushWidth;
@@ -172,6 +176,7 @@ class DrawingController extends ChangeNotifier {
   }
 
   void placeSelectedStamp(Offset position) {
+    _userEditedDuringRestore = true;
     final stamp = CanvasStamp(
       id: 'stamp-' + DateTime.now().microsecondsSinceEpoch.toString() + '-' + _nextStampOrder.toString(),
       kind: _selectedStamp,
@@ -191,6 +196,7 @@ class DrawingController extends ChangeNotifier {
 
   void setBackgroundColor(Color value) {
     if (_backgroundColor == value) return;
+    _userEditedDuringRestore = true;
     _pushUndoSnapshot();
     _backgroundColor = value;
     _documentRevision++;
@@ -199,6 +205,7 @@ class DrawingController extends ChangeNotifier {
 
   void clearCanvas() {
     if (_strokes.isEmpty && _stamps.isEmpty) return;
+    _userEditedDuringRestore = true;
     _pushUndoSnapshot();
     _strokes.clear();
     _stamps.clear();
@@ -264,13 +271,25 @@ class DrawingController extends ChangeNotifier {
 
   /// Persist drawings on-device only. If the user starts drawing before the
   /// asynchronous restore finishes, the new drawing always takes precedence.
+  Future<File> _resolveDocumentFile() async {
+    if (_documentFile != null) return _documentFile!;
+    final directory = await getApplicationDocumentsDirectory();
+    _documentFile = File(
+      '${directory.path}${Platform.pathSeparator}vibesync_drawing_document.json',
+    );
+    return _documentFile!;
+  }
+
   Future<void> restore() async {
     if (!persistenceEnabled) return;
     try {
-      _prefs ??= await SharedPreferences.getInstance();
-      final encoded = _prefs!.getString(_storageKey);
-      if (encoded == null || encoded.isEmpty) return;
-      if (_documentRevision != 0 || _strokes.isNotEmpty || _stamps.isNotEmpty) return;
+      final file = await _resolveDocumentFile();
+      if (!await file.exists()) return;
+      final encoded = await file.readAsString();
+      // Never overwrite work started while file I/O was pending.
+      if (_userEditedDuringRestore || _documentRevision != 0 ||
+          _strokes.isNotEmpty || _stamps.isNotEmpty) return;
+      if (encoded.isEmpty) return;
       final data = jsonDecode(encoded);
       if (data is! Map<String, dynamic> || data['version'] != 1) return;
       final loadedStrokes = <AdvancedStroke>[];
@@ -308,20 +327,26 @@ class DrawingController extends ChangeNotifier {
   void _schedulePersist() {
     if (!persistenceEnabled || _disposed) return;
     _persistTimer?.cancel();
-    _persistTimer = Timer(const Duration(milliseconds: 450), _persistDocument);
+    _persistTimer = Timer(const Duration(milliseconds: 450), () {
+      // Serialize writes so a slower old write cannot overwrite a newer drawing.
+      _writeQueue = _writeQueue.then((_) => _persistDocument()).catchError((Object error) {
+        debugPrint('Drawing auto-save queue failed: $error');
+      });
+    });
   }
 
   Future<void> _persistDocument() async {
     if (!persistenceEnabled || _disposed) return;
     try {
-      _prefs ??= await SharedPreferences.getInstance();
+      final file = await _resolveDocumentFile();
+      await file.parent.create(recursive: true);
       final payload = jsonEncode({
         'version': 1,
         'background': _backgroundColor.value,
         'strokes': _strokes.map((s) => s.toJson()).toList(),
         'stamps': _stamps.map((s) => s.toJson()).toList(),
       });
-      await _prefs!.setString(_storageKey, payload);
+      await file.writeAsString(payload, flush: true);
     } catch (error) {
       debugPrint('Drawing auto-save skipped: $error');
     }

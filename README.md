@@ -9,7 +9,7 @@ Flutter drawing and sticker app for young children. Android app code is under \`
 - Solid, neon and rainbow brush styles.
 - Vector sticker stamps for puppy, sunshine, rocket, unicorn, house, flower, pond and fish.
 - Undo/redo for strokes, stamps, background changes and clear operations.
-- Debounced local-only drawing auto-save and best-effort restore.
+- Debounced local-only JSON file auto-save and best-effort restore (avoids placing the full drawing into a small preferences string).
 - Six-language initial UI localization (English, Spanish, Hindi, Chinese, German and French).
 - Network availability notice while keeping the canvas usable offline.
 - Android Play in-app update check with graceful fallback when the Play API is unavailable.
