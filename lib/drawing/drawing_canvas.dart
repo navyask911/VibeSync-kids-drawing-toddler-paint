@@ -162,6 +162,9 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     try {
       await _ensureFillImagesLoaded();
       if (!mounted || generation != _fillGeneration) return;
+      // If the user edits the document while rasterization/flood fill runs,
+      // discard this result instead of adding a fill based on stale pixels.
+      final documentRevisionAtStart = widget.controller.revision;
 
       const safePixelLimit = 2000000;
       final deviceRatio = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 3.0).toDouble();
@@ -226,6 +229,10 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
 
       final pngBytes = await _encodeRgbaAsPng(result.overlayRgba, width, height);
       if (!mounted || generation != _fillGeneration) return;
+      if (widget.controller.revision != documentRevisionAtStart) {
+        widget.onBucketResult('bucket_cancelled');
+        return;
+      }
       final committed = widget.controller.commitFillLayer(
         pngBytes: pngBytes,
         logicalWidth: logicalSize.width,

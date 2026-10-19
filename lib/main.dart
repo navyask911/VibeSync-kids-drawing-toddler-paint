@@ -37,6 +37,40 @@ class _KidsDrawingAppState extends State<KidsDrawingApp> {
   Locale _locale = const Locale('en');
 
   @override
+  void initState() {
+    super.initState();
+    unawaited(_restoreLocale());
+  }
+
+  Future<void> _restoreLocale() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final savedCode = preferences.getString('vibesync_locale_v1');
+      if (!mounted || savedCode == null) return;
+      final isSupported = AppLocalizations.supportedLocales.any(
+        (locale) => locale.languageCode == savedCode,
+      );
+      if (isSupported) setState(() => _locale = Locale(savedCode));
+    } catch (error) {
+      debugPrint('Saved language could not be restored: $error');
+    }
+  }
+
+  void _changeLocale(Locale locale) {
+    setState(() => _locale = locale);
+    unawaited(_saveLocale(locale.languageCode));
+  }
+
+  Future<void> _saveLocale(String languageCode) async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString('vibesync_locale_v1', languageCode);
+    } catch (error) {
+      debugPrint('Language preference could not be saved: $error');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) => MaterialApp(
         title: 'VibeSync Kids Drawing Toddler Paint',
         locale: _locale,
@@ -54,7 +88,7 @@ class _KidsDrawingAppState extends State<KidsDrawingApp> {
           scaffoldBackgroundColor: const Color(0xFFFFFBEB),
         ),
         home: DrawingStudioScreen(
-          onLocaleChanged: (locale) => setState(() => _locale = locale),
+          onLocaleChanged: _changeLocale,
         ),
       );
 }

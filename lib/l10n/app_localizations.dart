@@ -36,6 +36,7 @@ class AppLocalizations {
       'bucket_large_area':'That area is too large to fill safely. Tap inside a smaller closed shape.',
       'bucket_failed':'Could not fill that area. Try another closed shape.','bucket_busy':'Finishing the previous fill…',
       'bucket_storage_limit':'The safe fill storage limit was reached. Undo some fills before adding more.',
+      'bucket_cancelled':'The drawing changed during filling. Please try again.',
     },
     'es': {
       'app_title':'Dibujo infantil VibeSync','brush':'Pincel','bucket':'Cubo de pintura','fill_color':'Color de relleno','stickers':'Pegatinas','colors':'Color del pincel',
@@ -62,6 +63,7 @@ class AppLocalizations {
       'bucket_large_area':'El área es demasiado grande. Toca dentro de una forma cerrada más pequeña.',
       'bucket_failed':'No se pudo colorear el área. Prueba otra forma cerrada.','bucket_busy':'Terminando el relleno anterior…',
       'bucket_storage_limit':'Se alcanzó el límite seguro de rellenos. Deshaz algunos antes de continuar.',
+      'bucket_cancelled':'El dibujo cambió durante el relleno. Inténtalo de nuevo.',
     },
     'hi': {
       'app_title':'VibeSync बच्चों की ड्रॉइंग','brush':'ब्रश','bucket':'रंग भरें','fill_color':'भरने का रंग','stickers':'स्टिकर','colors':'ब्रश का रंग',
@@ -88,6 +90,7 @@ class AppLocalizations {
       'bucket_large_area':'यह क्षेत्र बहुत बड़ा है। किसी छोटी बंद आकृति के अंदर टैप करें।',
       'bucket_failed':'रंग नहीं भर सके। दूसरी बंद आकृति आज़माएँ।','bucket_busy':'पिछला रंग भरना पूरा हो रहा है…',
       'bucket_storage_limit':'सुरक्षित रंग-भराव सीमा पूरी हो गई। जारी रखने से पहले कुछ भराव undo करें।',
+      'bucket_cancelled':'रंग भरते समय ड्रॉइंग बदल गई। कृपया फिर कोशिश करें।',
     },
     'zh': {
       'app_title':'VibeSync 儿童绘画','brush':'画笔','bucket':'油漆桶','fill_color':'填充颜色','stickers':'贴纸','colors':'画笔颜色',
@@ -110,6 +113,7 @@ class AppLocalizations {
       'bucket_filled':'区域已填色！','bucket_no_change':'请点击封闭图形内部并选择不同颜色。',
       'bucket_large_area':'区域太大，无法安全填充。请点击较小的封闭图形。','bucket_failed':'无法填充该区域，请尝试其他封闭图形。',
       'bucket_busy':'正在完成上一次填充…','bucket_storage_limit':'已达到安全填充存储上限。请撤销部分填充后再试。',
+      'bucket_cancelled':'填充期间绘画内容发生变化，请重试。',
     },
     'de': {
       'app_title':'VibeSync Kinderzeichnen','brush':'Pinsel','bucket':'Farbeimer','fill_color':'Füllfarbe','stickers':'Sticker','colors':'Pinselfarbe',
@@ -135,6 +139,7 @@ class AppLocalizations {
       'bucket_filled':'Bereich gefüllt!','bucket_no_change':'Tippe in eine geschlossene Form und wähle eine andere Farbe.',
       'bucket_large_area':'Der Bereich ist zu groß. Tippe in eine kleinere geschlossene Form.','bucket_failed':'Der Bereich konnte nicht gefüllt werden. Versuche eine andere geschlossene Form.',
       'bucket_busy':'Die vorherige Füllung wird abgeschlossen…','bucket_storage_limit':'Das sichere Fülllimit ist erreicht. Mache einige Füllungen rückgängig.',
+      'bucket_cancelled':'Die Zeichnung wurde während des Füllens geändert. Bitte versuche es erneut.',
     },
     'fr': {
       'app_title':'Dessin enfant VibeSync','brush':'Pinceau','bucket':'Pot de peinture','fill_color':'Couleur de remplissage','stickers':'Autocollants','colors':'Couleur du pinceau',
@@ -160,6 +165,7 @@ class AppLocalizations {
       'bucket_filled':'Zone coloriée !','bucket_no_change':'Touchez une forme fermée et choisissez une autre couleur.',
       'bucket_large_area':'Cette zone est trop grande. Touchez une forme fermée plus petite.','bucket_failed':'Impossible de colorier cette zone. Essayez une autre forme fermée.',
       'bucket_busy':'Le remplissage précédent se termine…','bucket_storage_limit':'La limite de remplissage est atteinte. Annulez quelques remplissages avant de continuer.',
+      'bucket_cancelled':'Le dessin a changé pendant le remplissage. Veuillez réessayer.',
     },
   };
 
