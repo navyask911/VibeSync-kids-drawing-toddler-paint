@@ -1,38 +1,73 @@
+
+---
+
+## 2. Privacy Policy Template
+
+Your existing `privacy-policy.html` is a good start, but it lacks details on **parental rights**, **data retention**, **third-party SDK disclosure**, and **contact information for data requests**. Below is an expanded version you can use to replace the current file.
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy - Kids Drawing: Toddler Paint</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 24px; color: #222; }
-    h1 { color: #1a73e8; }
-    h2 { margin-top: 24px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Kids Drawing: Toddler Paint</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; }
+        h1, h2 { color: #1a1a1a; }
+        .last-updated { color: #666; font-size: 0.9em; }
+    </style>
 </head>
 <body>
-  <h1>Privacy Policy for Kids Drawing: Toddler Paint</h1>
-  <p>Last updated: October 2026</p>
 
-  <h2>1. Overview</h2>
-  <p>Kids Drawing: Toddler Paint is committed to protecting the privacy of children and all users. Our application complies with the Children's Online Privacy Protection Act (COPPA), GDPR-K, and Google Play Families Policies.</p>
+    <h1>Privacy Policy for Kids Drawing: Toddler Paint</h1>
+    <p class="last-updated"><strong>Last updated:</strong> October 2026</p>
 
-  <h2>2. Information Collection & Usage</h2>
-  <p>We do NOT collect, store, transmit, or share any personally identifiable information (PII). Any drawings, sketches, or artwork created by the user remain stored locally on the device and are never uploaded to any remote server.</p>
+    <h2>1. Overview</h2>
+    <p>Kids Drawing: Toddler Paint ("the App," "we," "us") is committed to protecting the privacy of children and all users. This policy explains how we handle information when you use the App. We comply with the <strong>Children's Online Privacy Protection Act (COPPA)</strong>, <strong>GDPR-K</strong> (European Union), and the <strong>Google Play Families Policy</strong>.</p>
 
-  <h2>3. Advertising & Child-Directed Content</h2>
-  <p>Our app displays child-safe advertisements through Google Mobile Ads (AdMob). All ads conform to strict Google Play Families Policy guidelines:</p>
-  <ul>
-    <li>All ad requests are flagged with <code>tagForChildDirectedTreatment: true</code>.</li>
-    <li>Maximum ad content rating is restricted to <strong>G (General Audiences)</strong>.</li>
-    <li>Zero behavioral targeting or personalized profiling (<code>npa: '1'</code> enabled).</li>
-    <li>Interactive interstitial ads are protected behind an adult arithmetic Parental Gate.</li>
-  </ul>
+    <h2>2. Information We Do NOT Collect</h2>
+    <p>We do <strong>not</strong> collect, store, transmit, or share any personally identifiable information (PII) from any user, including children under 13. Specifically:</p>
+    <ul>
+        <li>We do not require account creation, login, or email addresses.</li>
+        <li>We do not collect names, ages, photos, or contact details.</li>
+        <li>All drawings, sketches, and artwork remain <strong>stored locally on the device</strong> and are never uploaded to any remote server.</li>
+    </ul>
 
-  <h2>4. Permissions</h2>
-  <p>The app only requests standard permissions strictly required for offline drawing canvas functionality and saving images locally to user device storage upon explicit request.</p>
+    <h2>3. Advertising & Child-Directed Content</h2>
+    <p>The App displays child-safe advertisements through <strong>Google Mobile Ads (AdMob)</strong>. All ad requests are configured to comply with strict child-safety standards:</p>
+    <ul>
+        <li><strong>Child-Directed Treatment:</strong> All ad requests are flagged with <code>tagForChildDirectedTreatment: true</code>.</li>
+        <li><strong>Content Rating Ceiling:</strong> The maximum ad content rating is restricted to <strong>G (General Audiences)</strong>.</li>
+        <li><strong>Non-Personalized Ads:</strong> Personalized advertising and behavioral profiling are <strong>disabled</strong> (<code>npa: '1'</code>). Ads are contextual only.</li>
+        <li><strong>Parental Gate:</strong> Interactive interstitial ads and rewarded video ads are protected behind an adult arithmetic <strong>Parental Gate</strong>.</li>
+    </ul>
+    <p>AdMob may collect certain non-personal device information (such as device type and general location) for ad delivery, frequency capping, and fraud prevention. You can review Google's privacy practices here: <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">https://policies.google.com/privacy</a>.</p>
 
-  <h2>5. Contact Us</h2>
-  <p>If you have any questions or feedback regarding this policy, please reach out via GitHub: https://github.com/navyask911/kids-drawing-toddler-paint</p>
+    <h2>4. Permissions</h2>
+    <p>The App only requests standard permissions strictly required for offline drawing canvas functionality and saving images locally to device storage upon explicit user request. We do not request access to contacts, camera, microphone, or precise location.</p>
+
+    <h2>5. Data Retention</h2>
+    <p>Because we do not collect personal data, there is no server-side data retention. Drawings saved to device storage remain under the user's control and can be deleted at any time through the device's file manager or by uninstalling the App.</p>
+
+    <h2>6. Parental Rights (COPPA & GDPR-K)</h2>
+    <p>Parents and guardians have the right to:</p>
+    <ul>
+        <li>Review any personal information we might hold (we hold none).</li>
+        <li>Request deletion of any data (uninstalling the App removes all locally stored drawings).</li>
+        <li>Refuse further collection or use of the child's information (by not using the App).</li>
+    </ul>
+    <p>If you believe we have inadvertently collected information from a child, please contact us immediately so we can delete it.</p>
+
+    <h2>7. Third-Party Services</h2>
+    <p>The only third-party service integrated into the App is <strong>Google Mobile Ads (AdMob)</strong>, configured as described in Section 3. We do not integrate analytics SDKs, social media SDKs, or crash-reporting tools that collect PII.</p>
+
+    <h2>8. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. Changes will be posted on this page with an updated "Last updated" date. Continued use of the App after changes constitutes acceptance of the revised policy.</p>
+
+    <h2>9. Contact Us</h2>
+    <p>If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us via the repository:</p>
+    <p><a href="https://github.com/navyask911/VibeSync-kids-drawing-toddler-paint" target="_blank" rel="noopener">https://github.com/navyask911/VibeSync-kids-drawing-toddler-paint</a></p>
+
 </body>
 </html>
