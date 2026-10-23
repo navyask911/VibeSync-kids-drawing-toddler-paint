@@ -61,24 +61,25 @@ export default function App() {
   const [adSimulatorOpen, setAdSimulatorOpen] = useState<boolean>(false);
   const [adSimulatorType, setAdSimulatorType] = useState<'rewarded' | 'interstitial'>('rewarded');
 
-  // Telemetry logs stream
+  // These are clearly labelled demo entries. This browser dashboard does not
+  // connect to the installed Flutter app or verify live AdMob serving.
   const [adLogs, setAdLogs] = useState<Array<{ id: string; time: string; text: string; type: 'info' | 'success' | 'warn' }>>([
     {
       id: 'l1',
       time: '11:16:00',
-      text: 'Production Android App ID active: ca-app-pub-4783826505860771~6744055015',
-      type: 'success',
+      text: 'Demo configuration example loaded; live AdMob app initialization has not been checked.',
+      type: 'info',
     },
     {
       id: 'l2',
       time: '11:16:01',
-      text: 'Production Banner Unit ID active: ca-app-pub-4783826505860771/2828860731 (NPA: "1", G-Rated)',
-      type: 'success',
+      text: 'Example banner unit ID is displayed for review only; live ad serving is not verified by this dashboard.',
+      type: 'info',
     },
     {
       id: 'l3',
       time: '11:16:02',
-      text: 'RequestConfiguration globally verified: COPPA:yes, MaxRating:G, UnderAgeConsent:yes',
+      text: 'Child-directed request flags are code examples only. Verify actual SDK behavior, consent, disclosures, and ad formats before release.',
       type: 'info',
     },
   ]);

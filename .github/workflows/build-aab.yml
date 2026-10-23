@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
+    inputs:
+      release:
+        description: "This run is intended to produce a new Play Store release"
+        required: true
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -14,6 +20,50 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify Android version code and name
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release) }}
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          CURRENT_VERSION="$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '"')"
+          CURRENT_CODE="${CURRENT_VERSION##*+}"
+          CURRENT_NAME="${CURRENT_VERSION%%+*}"
+          ANDROID_CODE="$(awk '/^[[:space:]]*versionCode[[:space:]]+[0-9]+/ { print $2; exit }' android/app/build.gradle)"
+          ANDROID_NAME="$(awk -F'"' '/^[[:space:]]*versionName[[:space:]]+"/ { print $2; exit }' android/app/build.gradle)"
+
+          if [[ ! "$CURRENT_CODE" =~ ^[0-9]+$ ]] || (( CURRENT_CODE <= 1 )); then
+            echo "::error::pubspec.yaml must use a numeric Android build number greater than 1."
+            exit 1
+          fi
+          if [[ "$CURRENT_CODE" != "$ANDROID_CODE" || "$CURRENT_NAME" != "$ANDROID_NAME" ]]; then
+            echo "::error::pubspec.yaml version and Android Gradle versionCode/versionName must match."
+            exit 1
+          fi
+
+          if [[ -n "$PR_BASE_SHA" ]]; then
+            BASE_SHA="$PR_BASE_SHA"
+          elif [[ -n "$PUSH_BASE_SHA" && "$PUSH_BASE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            BASE_SHA="$PUSH_BASE_SHA"
+          else
+            BASE_SHA="$(git rev-parse HEAD^)"
+          fi
+          BASE_VERSION="$(git show "$BASE_SHA:pubspec.yaml" | sed -n 's/^version: *//p' | tr -d '"')"
+          BASE_CODE="${BASE_VERSION##*+}"
+          if [[ ! "$BASE_CODE" =~ ^[0-9]+$ ]]; then
+            echo "::error::Could not read a numeric base version code from pubspec.yaml."
+            exit 1
+          fi
+          echo "Base version code: $BASE_CODE"
+          echo "Candidate version code: $CURRENT_CODE"
+          if (( CURRENT_CODE <= BASE_CODE )); then
+            echo "::error::Version code must increase for each release candidate."
+            exit 1
+          fi
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -27,19 +77,21 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Show build tool versions
-        run: |
-          flutter --version
-          java -version
-          flutter doctor -v
-
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Generate Android launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Run Flutter unit tests
+        run: flutter test
+
+      - name: Run Dart static analysis
+        run: flutter analyze --no-fatal-infos
 
       - name: Configure Release Keystore from Repository Secrets
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
-
           cat <<EOF > android/key.properties
           storePassword=${{ secrets.KEYSTORE_PASSWORD }}
           keyPassword=${{ secrets.KEY_PASSWORD }}
@@ -48,11 +100,26 @@ jobs:
           EOF
 
       - name: Clean and build release artifacts
+        env:
+          VIBESYNC_SUPPORT_URL: ${{ vars.VIBESYNC_SUPPORT_URL }}
+          COFFEE_SUPPORT_URL: ${{ vars.COFFEE_SUPPORT_URL }}
+          ADMOB_REWARDED_ANDROID: ${{ vars.ADMOB_REWARDED_ANDROID }}
+          ADMOB_REWARDED_IOS: ${{ vars.ADMOB_REWARDED_IOS }}
+          ADMOB_INTERSTITIAL_ANDROID: ${{ vars.ADMOB_INTERSTITIAL_ANDROID }}
+          ADMOB_INTERSTITIAL_IOS: ${{ vars.ADMOB_INTERSTITIAL_IOS }}
         run: |
+          set -euo pipefail
           flutter clean
           flutter pub get
-          flutter build appbundle --release
-          flutter build apk --release
+          BUILD_DEFINES=()
+          if [[ -n "$VIBESYNC_SUPPORT_URL" ]]; then BUILD_DEFINES+=(--dart-define="VIBESYNC_SUPPORT_URL=$VIBESYNC_SUPPORT_URL"); fi
+          if [[ -n "$COFFEE_SUPPORT_URL" ]]; then BUILD_DEFINES+=(--dart-define="COFFEE_SUPPORT_URL=$COFFEE_SUPPORT_URL"); fi
+          if [[ -n "$ADMOB_REWARDED_ANDROID" ]]; then BUILD_DEFINES+=(--dart-define="ADMOB_REWARDED_ANDROID=$ADMOB_REWARDED_ANDROID"); fi
+          if [[ -n "$ADMOB_REWARDED_IOS" ]]; then BUILD_DEFINES+=(--dart-define="ADMOB_REWARDED_IOS=$ADMOB_REWARDED_IOS"); fi
+          if [[ -n "$ADMOB_INTERSTITIAL_ANDROID" ]]; then BUILD_DEFINES+=(--dart-define="ADMOB_INTERSTITIAL_ANDROID=$ADMOB_INTERSTITIAL_ANDROID"); fi
+          if [[ -n "$ADMOB_INTERSTITIAL_IOS" ]]; then BUILD_DEFINES+=(--dart-define="ADMOB_INTERSTITIAL_IOS=$ADMOB_INTERSTITIAL_IOS"); fi
+          flutter build appbundle --release "${BUILD_DEFINES[@]}"
+          flutter build apk --release "${BUILD_DEFINES[@]}"
 
       - name: Verify 16 KB App Bundle alignment
         shell: bash
@@ -60,12 +127,9 @@ jobs:
           set -euo pipefail
           BUNDLE="build/app/outputs/bundle/release/app-release.aab"
           BUNDLETOOL_VERSION="1.18.3"
-          curl --fail --silent --show-error --location \
-            "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" \
-            --output "${RUNNER_TEMP}/bundletool.jar"
+          curl --fail --silent --show-error --location             "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar"             --output "${RUNNER_TEMP}/bundletool.jar"
 
-          java -jar "${RUNNER_TEMP}/bundletool.jar" dump config --bundle="${BUNDLE}" \
-            | tee "${RUNNER_TEMP}/bundle-config.txt"
+          java -jar "${RUNNER_TEMP}/bundletool.jar" dump config --bundle="${BUNDLE}"             | tee "${RUNNER_TEMP}/bundle-config.txt"
           if ! grep -q "PAGE_ALIGNMENT_16K" "${RUNNER_TEMP}/bundle-config.txt"; then
             echo "::error::The AAB does not request PAGE_ALIGNMENT_16K."
             exit 1
@@ -87,15 +151,12 @@ jobs:
             echo "::error::zipalign was not found in the Android SDK."
             exit 1
           fi
-
-          # Confirms that uncompressed native libraries use 16 KB ZIP alignment.
           "${ZIPALIGN}" -c -P 16 -v 4 "${APK}"
 
           EXTRACT_DIR="$(mktemp -d)"
           trap 'rm -rf "${EXTRACT_DIR}"' EXIT
           unzip -q "${APK}" -d "${EXTRACT_DIR}"
 
-          # Check every LOAD segment in each 64-bit native library.
           python3 - "${EXTRACT_DIR}" <<'PY'
           import glob
           import os
@@ -147,3 +208,24 @@ jobs:
           path: |
             build/app/outputs/bundle/release/*.aab
             build/app/outputs/flutter-apk/*.apk
+
+  dashboard-check:
+    name: Type-check and build React/Vite dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install locked dashboard dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check dashboard
+        run: bun run lint
+
+      - name: Build dashboard
+        run: bun run build

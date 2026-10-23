@@ -70,14 +70,14 @@ Text('$a + $b = ?') // Randomized adult arithmetic
       <div className="max-w-3xl mb-8">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold mb-3">
           <ShieldCheck className="w-4 h-4" />
-          Google Play Families Program Certified Architecture
+          Ad Safety Implementation Reference — Not Certification
         </div>
         <h2 className="text-2xl font-bold text-white tracking-tight">
-          AdMob Compliance Guide for Kids Applications
+          Ad Safety Implementation Reference for Child-Directed Apps
         </h2>
         <p className="text-sm text-slate-400 mt-2 leading-relaxed">
           Google Play enforces stringent guidelines on apps targeting children under 13.
-          This reference breaks down the technical mechanisms implemented in our <span className="font-mono text-slate-200">ad_helper.dart</span> and <span className="font-mono text-slate-200">main.dart</span> to ensure 100% compliance during Play Store review.
+          This reference describes some technical safeguards in <span className="font-mono text-slate-200">ad_helper.dart</span> and <span className="font-mono text-slate-200">main.dart</span>. It does not certify compliance or guarantee Play Store approval; review the current policies and the full app behavior before release.
         </p>
       </div>
 
@@ -123,7 +123,7 @@ Text('$a + $b = ?') // Randomized adult arithmetic
           </div>
           <div className="p-3 bg-slate-950/60 rounded-xl border border-blue-800/20">
             <span className="font-bold text-white block mb-1">2. Ads Declaration</span>
-            <span>Select "Yes, my app contains ads". Specify that ads are served exclusively by Google AdMob (certified family ad network).</span>
+            <span>Declare ads accurately and confirm that every ad SDK and mediation network actually used is eligible for the current Google Play Families requirements.</span>
           </div>
           <div className="p-3 bg-slate-950/60 rounded-xl border border-blue-800/20">
             <span className="font-bold text-white block mb-1">3. Families Policy</span>

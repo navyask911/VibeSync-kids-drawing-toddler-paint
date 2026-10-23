@@ -1,6 +1,6 @@
 /**
- * Flutter Kids Drawing App - AdMob & COPPA Architecture
- * Exportable production-grade Dart & XML snippets.
+ * VibeSync Kids Drawing Toddler Paint - AdMob & Flutter Architecture
+ * Exportable reference Dart & XML templates; verify against the integrated Flutter app before release.
  */
 
 export interface AdMobConfig {
@@ -25,7 +25,7 @@ export const GOOGLE_TEST_IDS: AdMobConfig = {
   iosInterstitialUnitId: 'ca-app-pub-3940256099942544/4411468910',
 };
 
-// User Production AdMob IDs (Google Play Families & COPPA Compliant)
+// User-configured AdMob IDs. Configuration alone does not establish policy compliance.
 export const PRODUCTION_CONFIG: AdMobConfig = {
   androidAppId: 'ca-app-pub-4783826505860771~6744055015',
   iosAppId: 'ca-app-pub-4783826505860771~6744055015',
@@ -40,8 +40,8 @@ export const PRODUCTION_CONFIG: AdMobConfig = {
 export function generateAdHelperDart(config: AdMobConfig, isUsingTestIds: boolean): string {
   return `// lib/ad_helper.dart
 // -----------------------------------------------------------------------------
-// Google Mobile Ads (AdMob) Singleton for Flutter Kids Drawing App
-// Strict COPPA, GDPR-K, and Google Play Families Policy Compliance
+// Google Mobile Ads (AdMob) Singleton for VibeSync Kids Drawing Toddler Paint
+// Child-directed ad request configuration example; not a compliance certification.
 // -----------------------------------------------------------------------------
 
 import 'dart:io';
@@ -68,40 +68,35 @@ class AdHelper {
   // 1. ADMOB UNIT IDENTIFIERS
   // ${isUsingTestIds ? 'NOTE: Currently configured with official Google AdMob Test IDs' : 'NOTE: Configured with your custom Live Production AdMob IDs'}
   // ---------------------------------------------------------------------------
+  static const String androidBannerAdUnitId = '${config.androidBannerUnitId}';
+  static const String iosBannerAdUnitId = '${config.iosBannerUnitId}';
+  static const String androidRewardedAdUnitId = '${config.androidRewardedUnitId}';
+  static const String iosRewardedAdUnitId = '${config.iosRewardedUnitId}';
+  static const String androidInterstitialAdUnitId = '${config.androidInterstitialUnitId}';
+  static const String iosInterstitialAdUnitId = '${config.iosInterstitialUnitId}';
+
   static String get bannerAdUnitId {
-    if (Platform.isAndroid) {
-      return '${config.androidBannerUnitId}';
-    } else if (Platform.isIOS) {
-      return '${config.iosBannerUnitId}';
-    } else {
-      throw UnsupportedError('Unsupported mobile platform for AdMob');
-    }
+    if (Platform.isAndroid) return androidBannerAdUnitId;
+    if (Platform.isIOS) return iosBannerAdUnitId;
+    throw UnsupportedError('Unsupported mobile platform for AdMob');
   }
 
   static String get rewardedAdUnitId {
-    if (Platform.isAndroid) {
-      return '${config.androidRewardedUnitId}';
-    } else if (Platform.isIOS) {
-      return '${config.iosRewardedUnitId}';
-    } else {
-      throw UnsupportedError('Unsupported mobile platform for AdMob');
-    }
+    if (Platform.isAndroid) return androidRewardedAdUnitId;
+    if (Platform.isIOS) return iosRewardedAdUnitId;
+    throw UnsupportedError('Unsupported mobile platform for AdMob');
   }
 
   static String get interstitialAdUnitId {
-    if (Platform.isAndroid) {
-      return '${config.androidInterstitialUnitId}';
-    } else if (Platform.isIOS) {
-      return '${config.iosInterstitialUnitId}';
-    } else {
-      throw UnsupportedError('Unsupported mobile platform for AdMob');
-    }
+    if (Platform.isAndroid) return androidInterstitialAdUnitId;
+    if (Platform.isIOS) return iosInterstitialAdUnitId;
+    throw UnsupportedError('Unsupported mobile platform for AdMob');
   }
 
   // ---------------------------------------------------------------------------
   // 2. COPPA & GOOGLE PLAY FAMILIES GLOBAL INITIALIZATION
   // ---------------------------------------------------------------------------
-  /// Initializes the Google Mobile Ads SDK with strict Families Policy settings.
+  /// Initializes Google Mobile Ads with request flags shown in this example. Review the complete app and current policies separately.
   /// Must be called after WidgetsFlutterBinding.ensureInitialized() in main().
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -339,8 +334,8 @@ class AdHelper {
 export function generateMainDart(): string {
   return `// lib/main.dart
 // -----------------------------------------------------------------------------
-// Flutter Kids Drawing & Coloring App Entry Point
-// Google Play Families Policy Compliant AdMob Integration
+// VibeSync Kids Drawing Toddler Paint Flutter App Entry Point
+// Google Mobile Ads integration example — policy review is still required
 // -----------------------------------------------------------------------------
 
 import 'dart:math';
@@ -364,7 +359,7 @@ class KidsDrawingApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: "Kids Drawing Studio",
+      title: "VibeSync Kids Drawing Toddler Paint",
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -564,7 +559,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('🎨 Toddler Drawing Pad'),
+        title: const Text('🎨 VibeSync Kids Drawing'),
         elevation: 0,
         backgroundColor: Colors.amber[300],
         actions: [
@@ -787,7 +782,7 @@ export function generateAndroidManifestXml(appId: string): string {
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
     <application
-        android:label="Kids Drawing: Toddler Paint"
+        android:label="VibeSync Kids Drawing Toddler Paint"
         android:name="\${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
@@ -839,7 +834,7 @@ export function generateAndroidManifestXml(appId: string): string {
 export function generatePubspecYaml(): string {
   return `# pubspec.yaml
 name: kids_drawing_toddler_paint
-description: "Child-Safe Kids Drawing Studio with AdMob COPPA & Families Policy"
+description: "VibeSync Kids Drawing Toddler Paint with child-directed AdMob settings"
 publish_to: "none"
 version: 1.0.0+1
 
@@ -868,11 +863,11 @@ dev_dependencies:
 # Run: dart run flutter_launcher_icons
 # ==============================================================================
 flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: true
+  android: "ic_launcher"
+  ios: false
   image_path: "assets/icon/app_icon.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#FFFBEB"
+  adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
 
 flutter:
@@ -1100,7 +1095,7 @@ captures/
 export function generateAdMobUnitTestDart(): string {
   return `// test/admob_coppa_test.dart
 // -----------------------------------------------------------------------------
-// Production Unit & Widget Test Suite for AdMob COPPA & Families Compliance
+// Reference tests for selected AdMob request invariants; not a compliance certification
 // -----------------------------------------------------------------------------
 
 import 'package:flutter_test/flutter_test.dart';
@@ -1168,10 +1163,20 @@ void main() {
       expect(request.extras!['npa'], equals('1'));
     });
 
-    test('Production AdMob IDs match verified format', () {
-      expect(AdHelper.bannerAdUnitId, startsWith('ca-app-pub-'));
-      expect(AdHelper.rewardedAdUnitId, startsWith('ca-app-pub-'));
-      expect(AdHelper.interstitialAdUnitId, startsWith('ca-app-pub-'));
+    test('Configured Android and iOS AdMob unit IDs have valid formats', () {
+      final ids = <String>[
+        AdHelper.androidBannerAdUnitId,
+        AdHelper.iosBannerAdUnitId,
+        AdHelper.androidRewardedAdUnitId,
+        AdHelper.iosRewardedAdUnitId,
+        AdHelper.androidInterstitialAdUnitId,
+        AdHelper.iosInterstitialAdUnitId,
+      ];
+      expect(ids, hasLength(6));
+      expect(ids.every((id) => id.startsWith('ca-app-pub-')), isTrue);
+      expect(AdHelper.androidBannerAdUnitId, equals('ca-app-pub-4783826505860771/2828860731'));
+      expect(AdHelper.androidRewardedAdUnitId, startsWith('ca-app-pub-3940256099942544/'));
+      expect(AdHelper.androidInterstitialAdUnitId, startsWith('ca-app-pub-3940256099942544/'));
     });
   });
 }
@@ -1179,33 +1184,33 @@ void main() {
 }
 
 export function generateCOPPAComplianceChecklist(): string {
-  return `# Google Play Families Policy & FTC COPPA Compliance Checklist
-Verified for Kids Drawing and Coloring Apps
+  return `# Child-Directed App Advertising Review Checklist
 
-## 1. SDK & RequestConfiguration
-- [x] **tagForChildDirectedTreatment**: Set to \`TagForChildDirectedTreatment.yes\`.
-      Notifies Google AdMob that all ad requests originate from children under 13 under US COPPA.
-- [x] **maxAdContentRating**: Explicitly set to \`MaxAdContentRating.g\`.
-      Restricts all creative inventory to G-rated (strictly appropriate for all child age groups).
-- [x] **tagForUnderAgeOfConsent**: Set to \`TagForUnderAgeOfConsent.yes\`.
-      Enforces GDPR-K (General Data Protection Regulation for Kids) compliance for European users.
-- [x] **Global Configuration Precedence**: \`MobileAds.instance.updateRequestConfiguration()\`
-      must execute before \`MobileAds.instance.initialize()\` so every adapter and network instance inherits policy flags.
+**This is a manual engineering checklist, not a certification or a report that these controls have passed.** Check each item only after verifying the current app, all included ad SDKs/mediation adapters, the developer's disclosures, and applicable law and Google Play policies.
 
-## 2. Non-Personalized Ads (NPA) Directive
-- [x] **AdRequest extras**: Include \`{'npa': '1'}\` in all banner, rewarded, and interstitial requests.
-- [x] **Zero Identifier Tracking**: No advertising ID (AAID / IDFA), behavioral cookies, or persistent device fingerprints collected or shared.
+## 1. SDK and ad requests
+- [ ] Confirm every SDK and mediation adapter actually included is permitted for the intended child audience and meets current Google Play Families requirements.
+- [ ] Verify the effective request configuration at runtime for child-directed treatment, under-age-of-consent treatment, and the allowed maximum ad content rating.
+- [ ] Verify non-personalized-ad handling where required. Do not infer that a request flag prevents every form of technical data processing.
+- [ ] Review each adapter and data flow rather than assuming global request flags override every SDK's behavior.
 
-## 3. Ad Placement & Toddler Ergonomics
-- [x] **Isolated Physical Boundary**: Sticky Banner Ad placed outside drawing canvas boundary.
-- [x] **Dedicated Safety Buffer**: Minimum 12-16px visual separator preventing toddler misclicks during vigorous scribbling.
-- [x] **Canvas Stroke Sentinel**: Interstitial and pop-up ads suppressed while \`isDrawingActive == true\`.
-- [x] **Parental Gate**: Arithmetic verification required before presenting rewarded video or interstitial ads.
+## 2. Data practices and disclosures
+- [ ] Review every SDK's current data-safety/collection disclosures and update the Play Console Data safety form and privacy policy to match observed behavior.
+- [ ] Audit advertising identifiers, diagnostics, network requests, cookies and third-party processing; do not assert "no data collected" without evidence.
+- [ ] Check applicable COPPA, GDPR-K and other child-privacy obligations with appropriate legal/policy review.
 
-## 4. Google Play Console Declarations
-- Target Audience: Choose "Ages 5 and under" or "Ages 6-8" under App Content -> Target audience.
-- Families Policy: Disclose that ads are served through the Google Mobile Ads SDK (AdMob is on the Google Play Certified Ad Network list).
-- Neutral Age Screen / Parental Gate: Required when linking to external stores or third-party web content.
-`;
+## 3. Placement and interaction
+- [ ] Keep banner ads physically separate from the drawing area and interactive drawing controls.
+- [ ] Verify spacing and touch behavior on real devices to reduce accidental clicks.
+- [ ] Verify no ad interrupts active drawing, pointer handling, undo/redo, canvas rasterization or other child interactions.
+- [ ] Review every rewarded/interstitial format and its trigger against current child-directed app policy. Do not enable formats merely because an arithmetic gate exists.
+- [ ] Ensure parental gates are not treated as a substitute for policy compliance and are appropriate for the actions they guard.
+
+## 4. Release validation
+- [ ] Verify production app/ad unit IDs in AdMob, and keep test IDs in development builds.
+- [ ] Verify the final signed AAB/APK, target audience, content rating, ads declaration and privacy-policy URL in Play Console.
+- [ ] Run automated tests, static analysis, physical-device tests, and a Play testing-track update test before production release.
+
+Record actual evidence and outstanding items separately. A checked code example is not proof of runtime behavior, legal compliance or Play Store approval.`;
 }
 
