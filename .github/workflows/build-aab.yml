@@ -27,13 +27,19 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Show build tool versions
+        run: |
+          flutter --version
+          java -version
+          flutter doctor -v
+
       - name: Install dependencies
         run: flutter pub get
 
       - name: Configure Release Keystore from Repository Secrets
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
-          
+
           cat <<EOF > android/key.properties
           storePassword=${{ secrets.KEYSTORE_PASSWORD }}
           keyPassword=${{ secrets.KEY_PASSWORD }}
@@ -41,10 +47,98 @@ jobs:
           storeFile=upload-keystore.jks
           EOF
 
-      - name: Build Android App Bundle (AAB) & APK
+      - name: Clean and build release artifacts
         run: |
-          flutter build appbundle --release --android-skip-build-dependency-validation
-          flutter build apk --release --android-skip-build-dependency-validation
+          flutter clean
+          flutter pub get
+          flutter build appbundle --release
+          flutter build apk --release
+
+      - name: Verify 16 KB App Bundle alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUNDLE="build/app/outputs/bundle/release/app-release.aab"
+          BUNDLETOOL_VERSION="1.18.3"
+          curl --fail --silent --show-error --location \
+            "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" \
+            --output "${RUNNER_TEMP}/bundletool.jar"
+
+          java -jar "${RUNNER_TEMP}/bundletool.jar" dump config --bundle="${BUNDLE}" \
+            | tee "${RUNNER_TEMP}/bundle-config.txt"
+          if ! grep -q "PAGE_ALIGNMENT_16K" "${RUNNER_TEMP}/bundle-config.txt"; then
+            echo "::error::The AAB does not request PAGE_ALIGNMENT_16K."
+            exit 1
+          fi
+
+      - name: Verify 16 KB APK ZIP and ELF alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [[ -z "${SDK_ROOT}" || ! -d "${SDK_ROOT}/build-tools" ]]; then
+            echo "::error::Android SDK build-tools directory was not found."
+            exit 1
+          fi
+
+          ZIPALIGN="$(find "${SDK_ROOT}/build-tools" -type f -name zipalign -print | sort -V | tail -n 1)"
+          if [[ -z "${ZIPALIGN}" ]]; then
+            echo "::error::zipalign was not found in the Android SDK."
+            exit 1
+          fi
+
+          # Confirms that uncompressed native libraries use 16 KB ZIP alignment.
+          "${ZIPALIGN}" -c -P 16 -v 4 "${APK}"
+
+          EXTRACT_DIR="$(mktemp -d)"
+          trap 'rm -rf "${EXTRACT_DIR}"' EXIT
+          unzip -q "${APK}" -d "${EXTRACT_DIR}"
+
+          # Check every LOAD segment in each 64-bit native library.
+          python3 - "${EXTRACT_DIR}" <<'PY'
+          import glob
+          import os
+          import subprocess
+          import sys
+
+          root = sys.argv[1]
+          libraries = []
+          for abi in ("arm64-v8a", "x86_64"):
+              libraries.extend(glob.glob(os.path.join(root, "lib", abi, "*.so")))
+
+          if not libraries:
+              print("ERROR: No arm64-v8a or x86_64 native libraries found in APK.", file=sys.stderr)
+              sys.exit(1)
+
+          failures = []
+          segments_checked = 0
+          for library in sorted(libraries):
+              output = subprocess.check_output(["readelf", "-lW", library], text=True)
+              load_segments = [
+                  line.split() for line in output.splitlines()
+                  if line.split() and line.split()[0] == "LOAD"
+              ]
+              if not load_segments:
+                  failures.append(f"{library}: no ELF LOAD segments were parsed")
+                  continue
+
+              for fields in load_segments:
+                  alignment = int(fields[-1], 16)
+                  segments_checked += 1
+                  if alignment < 0x4000 or alignment % 0x4000 != 0:
+                      failures.append(
+                          f"{library}: LOAD alignment {alignment:#x} is below/not a multiple of 0x4000"
+                      )
+
+          if failures:
+              print("16 KB ELF alignment check failed:", file=sys.stderr)
+              for failure in failures:
+                  print(f" - {failure}", file=sys.stderr)
+              sys.exit(1)
+
+          print(f"PASS: {len(libraries)} 64-bit native libraries, {segments_checked} LOAD segments aligned for 16 KB pages.")
+          PY
 
       - name: Upload Release Artifacts
         uses: actions/upload-artifact@v4
