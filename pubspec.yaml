@@ -5,14 +5,14 @@ version: 1.0.3+20261022
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
-  flutter: ">=3.10.0"
+  flutter: ">=3.24.0"
 
 dependencies:
   flutter:
     sdk: flutter
 
-  # Google Mobile Ads official Flutter plugin
-  google_mobile_ads: ^5.2.0
+  # Google Mobile Ads plugin with current Android SDK dependency and 16 KB-compatible SDKs.
+  google_mobile_ads: ^9.2.0
 
 dev_dependencies:
   flutter_test:
