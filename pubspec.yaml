@@ -12,7 +12,7 @@ dependencies:
     sdk: flutter
 
   # Google Mobile Ads plugin with current Android SDK dependency and 16 KB-compatible SDKs.
-  google_mobile_ads: ^9.2.0
+  google_mobile_ads: 9.2.0
 
 dev_dependencies:
   flutter_test:
