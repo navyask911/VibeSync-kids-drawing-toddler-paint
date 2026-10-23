@@ -16,7 +16,7 @@ def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "
 def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.3"
 
 // -----------------------------------------------------------------------------
-// 1. SECURE KEYSTORE SIGNATURE LOADING
+// SECURE KEYSTORE SIGNATURE LOADING
 // Loads keyAlias, keyPassword, storeFile, storePassword from key.properties
 // -----------------------------------------------------------------------------
 def keystoreProperties = new Properties()
@@ -30,6 +30,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace "com.navya.kids_drawing_studio"
     compileSdk = 36
+    // Keep the NDK version selected by this pinned Flutter SDK.
     ndkVersion flutter.ndkVersion
 
     compileOptions {
@@ -47,12 +48,18 @@ android {
 
     defaultConfig {
         applicationId "com.navya.kids_drawing_studio"
-        // Google Mobile Ads SDK requirement: minSdkVersion 21 or higher
         minSdkVersion 21
         targetSdkVersion 36
         versionCode 20261022
         versionName "1.0.3"
         multiDexEnabled true
+    }
+
+    // Keep native libraries uncompressed so AGP can 16 KB-align them in APKs.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
 
     signingConfigs {
@@ -68,14 +75,13 @@ android {
 
     buildTypes {
         release {
-            // Apply release signature if key.properties is provided; fallback to debug signing in CI/test environments
+            // Use the configured upload/release key when available.
             if (keystoreProperties['storeFile'] != null) {
                 signingConfig signingConfigs.release
             } else {
                 signingConfig signingConfigs.debug
             }
 
-            // Enable R8 code shrinking, obfuscation, and resource optimization
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
@@ -97,5 +103,6 @@ flutter {
 
 dependencies {
     implementation "androidx.multidex:multidex:2.0.1"
-    implementation "com.google.android.gms:play-services-ads:23.0.0"
+    // google_mobile_ads supplies its compatible Google Mobile Ads Android SDK.
+    // Avoid pinning an older play-services-ads version here.
 }
