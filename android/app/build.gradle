@@ -48,7 +48,8 @@ android {
 
     defaultConfig {
         applicationId "com.navya.kids_drawing_studio"
-        minSdkVersion 21
+        // Google Mobile Ads SDK v24 requires Android API 23 or higher.
+        minSdkVersion 23
         targetSdkVersion 36
         versionCode 20261022
         versionName "1.0.3"
