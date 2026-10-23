@@ -1,7 +1,7 @@
 name: kids_drawing_toddler_paint
 description: "Child-Safe Kids Drawing Studio with AdMob COPPA & Families Policy"
 publish_to: "none"
-version: 1.0.3+20261022
+version: 1.0.4+20261023
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
