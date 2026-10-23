@@ -1,6 +1,6 @@
 {
-  "name": "Flutter Kids Drawing App - COPPA & Families AdMob Hub",
-  "description": "Google Play Families Policy and COPPA-compliant Google Mobile Ads (AdMob) Flutter architecture, singleton AdHelper, parental gate, and interactive simulator.",
+  "name": "VibeSync Kids Drawing Toddler Paint — Flutter & AdMob Tools",
+  "description": "Developer dashboard with Flutter source templates, AdMob configuration examples, parental-gate demo and interactive drawing simulator. Dashboard checks are illustrative and do not execute Flutter tests.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -68,10 +68,20 @@ void main() {
       expect(request.extras!['npa'], equals('1'));
     });
 
-    test('Production AdMob IDs match verified format', () {
-      expect(AdHelper.bannerAdUnitId, startsWith('ca-app-pub-'));
-      expect(AdHelper.rewardedAdUnitId, startsWith('ca-app-pub-'));
-      expect(AdHelper.interstitialAdUnitId, startsWith('ca-app-pub-'));
+    test('Configured Android and iOS AdMob unit IDs have valid formats', () {
+      final ids = <String>[
+        AdHelper.androidBannerAdUnitId,
+        AdHelper.iosBannerAdUnitId,
+        AdHelper.androidRewardedTestAdUnitId,
+        AdHelper.iosRewardedTestAdUnitId,
+        AdHelper.androidInterstitialTestAdUnitId,
+        AdHelper.iosInterstitialTestAdUnitId,
+      ];
+      expect(ids, hasLength(6));
+      expect(ids.every((id) => id.startsWith('ca-app-pub-')), isTrue);
+      expect(AdHelper.androidBannerAdUnitId, equals('ca-app-pub-4783826505860771/2828860731'));
+      expect(AdHelper.androidRewardedTestAdUnitId, startsWith('ca-app-pub-3940256099942544/'));
+      expect(AdHelper.androidInterstitialTestAdUnitId, startsWith('ca-app-pub-3940256099942544/'));
     });
   });
 }

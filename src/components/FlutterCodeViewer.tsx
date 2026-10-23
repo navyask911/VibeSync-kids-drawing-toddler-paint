@@ -110,14 +110,14 @@ export const FlutterCodeViewer: React.FC<FlutterCodeViewerProps> = ({
           <div className="flex items-center gap-2">
             <FileCode className="w-5 h-5 text-blue-400" />
             <h2 className="text-base font-bold text-white tracking-tight">
-              Production Flutter Deliverables
+              Flutter & AdMob Reference Snippets
             </h2>
             <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-medium">
               Flutter 3.x+ / google_mobile_ads ^5.2.0
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Complete, copy-ready singleton architecture with strict COPPA, NPA, and Families compliance.
+            Illustrative source templates and ID configuration. These snippets are not the integrated app source and do not certify COPPA, GDPR-K, or Google Play Families Policy compliance.
           </p>
         </div>
 

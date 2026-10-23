@@ -1,63 +1,57 @@
-# Kids Drawing: Toddler Paint 🎨
+# VibeSync Kids Drawing Toddler Paint
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.x-blue.svg)](https://flutter.dev)
-[![COPPA](https://img.shields.io/badge/COPPA-Compliant-green.svg)](https://www.ftc.gov/legal-library/browse/rules/childrens-online-privacy-protection-rule-coppa)
-[![Google Play Families](https://img.shields.io/badge/Google_Play-Families_Policy-orange.svg)](https://support.google.com/googleplay/android-developer/answer/9893335)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+A child-friendly Flutter drawing application with freehand drawing, brush styles, stickers, coloring templates, undo/redo and a bounded paint-bucket tool.
 
-A COPPA and Google Play Families compliant Flutter drawing application designed for toddlers and young children. Built with child-safe monetization, stroke protection, and parental gates.
+## App source
 
-## 🧒 Why This Project?
+- `lib/main.dart`: app shell, AdMob lifecycle, in-app update prompt, parent-gated support and language selection.
+- `lib/drawing/drawing_controller.dart`: drawing state, immutable stroke history, stamps, canvas fills and bounded undo/redo.
+- `lib/drawing/drawing_models.dart`: typed strokes, stamps, layers and coloring-page types.
+- `lib/drawing/drawing_painters.dart`: background/template/stamp/stroke painter layers with neon and rainbow styles.
+- `lib/drawing/drawing_canvas.dart`: pointer handling, asynchronous raster fill and parent-gated PNG sharing.
+- `lib/drawing/drawing_persistence.dart`: bounded local autosave/restore of strokes, stamps, palette and raster fill layers.
+- `lib/drawing/flood_fill.dart`: bounded non-recursive RGBA flood-fill algorithm that runs through Flutter's compute isolate.
+- `lib/l10n/app_localizations.dart`: initial English, Spanish, Hindi, Chinese, German and French strings.
+- `lib/ad_helper.dart`: existing AdMob request configuration and ad lifecycle helper.
+- `src/`: separate React/Vite developer dashboard and generated-code demonstration.
 
-Most drawing apps for kids are cluttered with aggressive, misclick-prone ads. **Kids Drawing: Toddler Paint** solves this by combining a smooth, toddler-friendly canvas with a **zero-interruption ad model**: full-screen ads are disabled while a child is drawing, banner ads have a physical safe buffer, and every external link or rewarded ad is locked behind an arithmetic **Parental Gate**. The result is a creative space that respects both the child's attention and the parent's trust.
+## Offline behavior and optional support
 
-## ✨ Key Features
+The drawing screen opens before ad/network initialization completes. Drawing operations remain local to the device and usable when the internet is unavailable. Internet status is checked so the app can show a non-blocking offline banner and retry update checks when the connection returns.
 
-- **Kid-Safe Canvas:** Smooth toddler finger painting, rainbow brushes, neon glow pens, and animal coloring templates.
-- **Stroke Suppression Sentinel:** Full-screen ads are strictly blocked while the child has their finger on the canvas to prevent interruptions.
-- **Physical Safe Buffer:** Bottom-anchored banner ads include a dedicated physical separation buffer to eliminate accidental toddler misclicks.
-- **Parental Gate Challenge:** Arithmetic verification (e.g., `4 + 3 = ?`) protects bonus coloring page unlocks, external links, and rewarded video ads.
-- **Offline-First:** Drawings are saved locally on the device; no artwork is ever uploaded to a remote server.
+The Android in-app update prompt uses Google Play's in-app update API and therefore requires an eligible Google Play install and a published update. Local APKs and ordinary emulator runs cannot fully verify that native update flow.
 
-## 🛡️ Policy & COPPA Compliance
+Parents can export artwork as a PNG through the system share sheet after passing the parent gate. The app creates a temporary local image; it does not upload artwork to a developer-operated server.
 
-This application adheres to the **Google Play Families Policy**, **FTC COPPA**, and **GDPR-K**. The core compliance logic lives in `lib/ad_helper.dart`:
+An optional coffee/support action is available only after the arithmetic parent gate. Configure a valid HTTPS support page at build time:
 
-| Protection | Implementation |
-| :--- | :--- |
-| **Child-Directed Flag** | `tagForChildDirectedTreatment: TagForChildDirectedTreatment.yes` |
-| **Age Rating Ceiling** | `maxAdContentRating: MaxAdContentRating.g` (strictly G-rated ads) |
-| **European Underage Protection** | `tagForUnderAgeOfConsent: TagForUnderAgeOfConsent.yes` |
-| **Non-Personalized Ads (NPA)** | All ad requests enforce `extras: {'npa': '1'}` with zero user profiling or tracking. |
-| **Parental Consent** | Arithmetic gate before any external link, rewarded ad, or bonus unlock. |
+```sh
+flutter build appbundle --release --dart-define=COFFEE_SUPPORT_URL=https://your-real-support-page.example
+```
 
-For a full breakdown, see [`COPPA_CHECKLIST.md`](COPPA_CHECKLIST.md) and [`privacy-policy.html`](privacy-policy.html).
+Replace the example with the actual creator-owned support URL before release. Without a configured URL, the app explains that the link has not been set and keeps all drawing features available. No support prompt is shown directly to children.
 
-## 🏗️ Project Structure
+## Advertising and child safety
 
-| File | Purpose |
-| :--- | :--- |
-| `lib/ad_helper.dart` | AdMob singleton manager with COPPA `RequestConfiguration` |
-| `lib/main.dart` | Drawing pad UI, stroke sentinel, safe banner dock, & parental gate |
-| `android/app/src/main/AndroidManifest.xml` | Production AdMob Application ID configuration |
-| `android/app/build.gradle` | Release signing wiring and R8 code shrinking rules |
-| `android/app/proguard-rules.pro` | Google Mobile Ads R8 preservation rules |
-| `android/key.properties.example` | Keystore credentials template |
-| `pubspec.yaml` | Flutter dependencies and launcher icons configuration |
-| `test/admob_coppa_test.dart` | 12/12 automated unit and invariant test suite |
-| `COPPA_CHECKLIST.md` | Play Console Families audit checklist |
+The app applies child-directed AdMob request settings and keeps the banner isolated from the drawing canvas. Rewarded/interstitial test IDs are used only in debug builds. Release builds do not load those formats unless production IDs are configured with `--dart-define=ADMOB_REWARDED_ANDROID=...` and/or `--dart-define=ADMOB_INTERSTITIAL_ANDROID=...` (use corresponding `_IOS` values for iOS). Without a production rewarded ID, locked coloring pages can be unlocked after parent approval without an ad. A configuration flag is not a certification: verify the current Google Play Families policies, ad SDK eligibility, app content, privacy notice and Play Console declarations before release.
 
-## 🚀 Getting Started
+## Build and verification
 
-### Prerequisites
+Use Flutter stable and Java 17.
 
-- Flutter SDK (3.x or later)
-- Android Studio / VS Code with the Flutter plugin
-- A Google AdMob account (for production ad unit IDs)
-
-### Installation
-
-```bash
-git clone https://github.com/navyask911/VibeSync-kids-drawing-toddler-paint.git
-cd VibeSync-kids-drawing-toddler-paint
+```sh
 flutter pub get
+dart run flutter_launcher_icons
+flutter test
+flutter analyze
+flutter build appbundle --release
+```
+
+GitHub Actions runs launcher generation, Flutter tests, static analysis and release AAB/APK builds. Test the drawing canvas on physical Android devices and test native Play update flows through a Play testing track before production release.
+
+
+## Android release versioning
+
+The current candidate is version name `1.0.5` with build/version code `20261024` (`version: 1.0.5+20261024` in `pubspec.yaml`). CI checks that the numeric code increases from the base revision and matches the Android Gradle version settings. Play Console's previously used version codes are external to this repository, so verify the code is still unused before publishing.
+
+The release workflow also checks App Bundle alignment configuration, APK ZIP alignment and ELF LOAD-segment alignment for 16 KB pages. A passing CI build is a technical check, not a Google Play policy/compliance certification.

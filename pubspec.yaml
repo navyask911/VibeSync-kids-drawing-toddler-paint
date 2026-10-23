@@ -1,7 +1,7 @@
 name: kids_drawing_toddler_paint
-description: "Child-Safe Kids Drawing Studio with AdMob COPPA & Families Policy"
+description: "VibeSync Kids Drawing Toddler Paint with child-directed AdMob settings"
 publish_to: "none"
-version: 1.0.4+20261023
+version: 1.0.5+20261024
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -10,8 +10,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
-  # Google Mobile Ads plugin with current Android SDK dependency and 16 KB-compatible SDKs.
+  in_app_update: ^4.2.5
+  internet_connection_checker_plus: ^3.1.2
+  url_launcher: ^6.3.2
+  path_provider: ^2.1.5
+  share_plus: ^10.1.4
+
+  # Google Mobile Ads official Flutter plugin
   google_mobile_ads: 9.2.0
 
 dev_dependencies:
@@ -28,15 +36,15 @@ dev_dependencies:
 # Run: dart run flutter_launcher_icons
 # ==============================================================================
 flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: true
+  android: "ic_launcher"
+  ios: false
   image_path: "assets/icon/app_icon.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#FFFBEB"
+  adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
 
 flutter:
   uses-material-design: true
-  # Assets can be enabled when assets files are added to the directory:
+  # Assets can be enabled when asset files are added to the directory:
   # assets:
   #   - assets/icon/

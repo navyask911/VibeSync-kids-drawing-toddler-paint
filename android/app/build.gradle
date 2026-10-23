@@ -12,8 +12,8 @@ if (localPropertiesFile.exists()) {
     }
 }
 
-def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "20261023"
-def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.4"
+def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "20261024"
+def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.5"
 
 // -----------------------------------------------------------------------------
 // SECURE KEYSTORE SIGNATURE LOADING
@@ -51,8 +51,8 @@ android {
         // Google Mobile Ads SDK v24 requires Android API 23 or higher.
         minSdkVersion 23
         targetSdkVersion 36
-        versionCode 20261023
-        versionName "1.0.4"
+        versionCode 20261024
+        versionName "1.0.5"
         multiDexEnabled true
     }
 
