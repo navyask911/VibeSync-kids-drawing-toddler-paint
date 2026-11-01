@@ -53,6 +53,15 @@ jobs:
           else
             BASE_SHA="$(git rev-parse HEAD^)"
           fi
+
+          # Force-updated branches can report a PUSH_BASE_SHA that is no longer
+          # reachable from the fetched refs. Fall back to the first parent of
+          # the checked-out commit so version validation remains deterministic.
+          if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            echo "::warning::Push base $BASE_SHA is unavailable; comparing against HEAD^ instead."
+            BASE_SHA="$(git rev-parse HEAD^)"
+          fi
+
           BASE_VERSION="$(git show "$BASE_SHA:pubspec.yaml" | sed -n 's/^version: *//p' | tr -d '"')"
           BASE_CODE="${BASE_VERSION##*+}"
           if [[ ! "$BASE_CODE" =~ ^[0-9]+$ ]]; then
