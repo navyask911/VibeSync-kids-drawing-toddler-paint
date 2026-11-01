@@ -2,10 +2,15 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:in_app_update/in_app_update.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
@@ -20,6 +25,7 @@ import 'drawing/drawing_models.dart';
 import 'drawing/drawing_persistence.dart';
 import 'drawing/drawing_painters.dart';
 import 'l10n/app_localizations.dart';
+import 'subscriptions/ad_free_subscription_service.dart';
 
 const String _coffeeSupportUrl = String.fromEnvironment('COFFEE_SUPPORT_URL');
 
@@ -85,6 +91,8 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
     with WidgetsBindingObserver {
   final DrawingController _drawing = DrawingController();
   final DrawingPersistence _persistence = DrawingPersistence();
+  final AdFreeSubscriptionService _subscription = AdFreeSubscriptionService();
+  bool _subscriptionReady = false;
   Timer? _autosaveTimer;
   bool _restoringDrawing = true;
   bool _autosaveInProgress = false;
@@ -113,6 +121,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
     WidgetsBinding.instance.addObserver(this);
     unawaited(_restoreLocalDrawing());
     _listenForInternet();
+    unawaited(_initializeSubscription());
     if (defaultTargetPlatform == TargetPlatform.android) {
       _updateSubscription = InAppUpdate.installUpdateListener.listen(
         _onInstallStatus,
@@ -122,6 +131,39 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
     }
   }
 
+  Future<void> _initializeSubscription() async {
+    _subscription.addListener(_onSubscriptionChanged);
+    await _subscription.initialize();
+    if (!mounted) return;
+    setState(() => _subscriptionReady = true);
+    _onSubscriptionChanged();
+    if (!_subscription.isAdFree && _isOnline == true) {
+      unawaited(_initializeAdsIfOnline());
+    }
+  }
+
+  void _onSubscriptionChanged() {
+    AdHelper.instance.setAdsEnabled(!_subscription.isAdFree);
+    if (_subscription.isAdFree) {
+      final banner = _bannerAd;
+      _bannerAd = null;
+      _bannerLoaded = false;
+      banner?.dispose();
+    } else {
+      // Expired/revoked premium state cannot keep premium-only tools active
+      // from a drawing snapshot restored on an earlier app session.
+      if (_drawing.brushStyle.requiresSubscription) {
+        _drawing.setBrushStyle(StrokeStyle.solid);
+      }
+      if (_drawing.selectedPage.requiresSubscription) {
+        _drawing.setSelectedPage(ColoringPage.freeDraw);
+      }
+      if (_subscriptionReady && _isOnline == true && mounted) {
+        unawaited(_initializeAdsIfOnline());
+      }
+    }
+    if (mounted) setState(() {});
+  }
 
   Future<void> _restoreLocalDrawing() async {
     try {
@@ -191,13 +233,13 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
     final changed = _isOnline != online;
     if (changed) setState(() => _isOnline = online);
     if (online && changed) {
-      unawaited(_initializeAdsIfOnline());
+      if (_subscriptionReady && !_subscription.isAdFree) unawaited(_initializeAdsIfOnline());
       unawaited(_checkForUpdate());
     }
   }
 
   Future<void> _initializeAdsIfOnline() async {
-    if (_isOnline != true || _adsInitializing || AdHelper.instance.isInitialized) {
+    if (!_subscriptionReady || _subscription.isAdFree || _isOnline != true || _adsInitializing || AdHelper.instance.isInitialized) {
       return;
     }
     _adsInitializing = true;
@@ -216,7 +258,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
   }
 
   void _loadBottomBanner() {
-    if (!mounted || _isOnline != true) return;
+    if (!mounted || !_subscriptionReady || _subscription.isAdFree || _isOnline != true) return;
     _bannerAd?.dispose();
     setState(() {
       _bannerLoaded = false;
@@ -246,9 +288,12 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
     }
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshInternetStatus());
+      unawaited(_subscription.restorePurchases());
       if (_isOnline == true) {
         unawaited(_checkForUpdate());
-        unawaited(_initializeAdsIfOnline());
+        if (_subscriptionReady && !_subscription.isAdFree) {
+          unawaited(_initializeAdsIfOnline());
+        }
       }
     }
   }
@@ -429,6 +474,8 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
             children: <Widget>[
               Text(strings.translate('parents_corner_help')),
               const SizedBox(height: 14),
+              _buildSubscriptionControls(strings),
+              const SizedBox(height: 14),
               Text(
                 strings.translate('choose_language'),
                 style: const TextStyle(fontWeight: FontWeight.w700),
@@ -490,6 +537,311 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
     );
   }
 
+  Widget _buildSubscriptionControls(AppLocalizations strings) {
+    return AnimatedBuilder(
+      animation: _subscription,
+      builder: (context, _) {
+        final price = _subscription.product?.price ?? 'Price shown by Google Play';
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const Text('VibeSync Ad-Free — yearly subscription',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 5),
+                Text(_subscription.isAdFree
+                    ? 'Ad-free access is active on this device.'
+                    : '$price · One year · Auto-renews unless canceled in Google Play.'),
+                const SizedBox(height: 8),
+                if (!_subscription.isAdFree)
+                  FilledButton.icon(
+                    onPressed: _subscription.product == null || _subscription.isPurchasing
+                        ? null
+                        : _purchaseAdFreeSubscription,
+                    icon: const Icon(Icons.workspace_premium),
+                    label: Text(_subscription.isPurchasing
+                        ? 'Waiting for Google Play…'
+                        : 'Subscribe / unlock premium'),
+                  ),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: <Widget>[
+                    TextButton(
+                      onPressed: _subscription.isRestoring ? null : _restoreAdFreeSubscription,
+                      child: const Text('Restore purchases'),
+                    ),
+                    TextButton(
+                      onPressed: _manageSubscription,
+                      child: const Text('Manage subscription'),
+                    ),
+                  ],
+                ),
+                if (_subscription.message != null)
+                  Text(_subscription.message!, style: Theme.of(context).textTheme.bodySmall),
+                const Divider(),
+                const Text('Premium creative tools',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                const Text('Neon and rainbow brushes, extended colors, three extra templates, print-ready PDF, and artwork backup.'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: <Widget>[
+                    OutlinedButton.icon(
+                      onPressed: _subscription.isAdFree ? _exportArtworkPdf : _showPremiumOffer,
+                      icon: const Icon(Icons.picture_as_pdf),
+                      label: const Text('Export / print PDF'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _subscription.isAdFree ? _backupArtwork : _showPremiumOffer,
+                      icon: const Icon(Icons.backup_outlined),
+                      label: const Text('Back up artwork'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _subscription.isAdFree ? _restoreArtworkBackup : _showPremiumOffer,
+                      icon: const Icon(Icons.restore),
+                      label: const Text('Restore backup'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _purchaseAdFreeSubscription() async {
+    if (!await _promptParentalGate() || !mounted) return;
+    if (_subscription.product == null) await _subscription.refreshProductDetails();
+    await _subscription.purchase();
+  }
+
+  Future<void> _restoreAdFreeSubscription() async {
+    if (!await _promptParentalGate() || !mounted) return;
+    await _subscription.restorePurchases();
+  }
+
+  Future<void> _manageSubscription() async {
+    if (!await _promptParentalGate() || !mounted) return;
+    final uri = Uri.https(
+      'play.google.com',
+      '/store/account/subscriptions',
+      <String, String>{
+        'sku': AdFreeSubscriptionService.productId,
+        'package': 'com.navya.kids_drawing_studio',
+      },
+    );
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (error) {
+      debugPrint('Could not open Google Play subscription management: $error');
+      if (mounted) _showMessage('Open Google Play > Payments and subscriptions to manage this plan.');
+    }
+  }
+
+  Future<void> _showPremiumOffer() async {
+    if (_subscription.isAdFree || !await _promptParentalGate() || !mounted) return;
+    await _subscription.refreshProductDetails();
+    if (!mounted) return;
+    final price = _subscription.product?.price ?? 'Price and availability shown by Google Play';
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.workspace_premium, size: 34),
+        title: const Text('Unlock VibeSync Premium'),
+        content: Text(
+          '$price for one year, billed and managed by Google Play. '
+          'Unlock ad-free drawing, neon and rainbow brushes, extra colors and templates, '
+          'PDF export, and parent-controlled artwork backup. '
+          'The final price and renewal details are shown by Google Play before purchase.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: _subscription.product == null || _subscription.isPurchasing
+                ? null
+                : () {
+                    Navigator.of(dialogContext).pop();
+                    unawaited(_purchaseAdFreeSubscription());
+                  },
+            child: const Text('Continue to Google Play'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _unlockPremiumBrush(StrokeStyle style) async {
+    await _showPremiumOffer();
+    if (mounted && _subscription.isAdFree) _drawing.setBrushStyle(style);
+  }
+
+  Future<Uint8List?> _captureArtworkPng() async {
+    final renderObject = _canvasKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox || renderObject.size.isEmpty) {
+      _showMessage('The drawing is not ready to export.');
+      return null;
+    }
+    final logicalSize = renderObject.size;
+    final logicalPixels = logicalSize.width * logicalSize.height;
+    if (!logicalPixels.isFinite || logicalPixels <= 0 ||
+        logicalPixels > DrawingController.maxRasterPixels) {
+      _showMessage(AppLocalizations.of(context).translate('save_too_large'));
+      return null;
+    }
+    final pixelRatio = min(
+      2.0,
+      sqrt(DrawingController.maxRasterPixels / logicalPixels),
+    );
+    final pixelWidth = (logicalSize.width * pixelRatio).ceil();
+    final pixelHeight = (logicalSize.height * pixelRatio).ceil();
+    if (pixelWidth <= 0 || pixelHeight <= 0 ||
+        pixelWidth * pixelHeight > DrawingController.maxRasterPixels) {
+      _showMessage(AppLocalizations.of(context).translate('save_too_large'));
+      return null;
+    }
+
+    ui.Picture? picture;
+    ui.Image? image;
+    try {
+      final recorder = ui.PictureRecorder();
+      final exportCanvas = Canvas(
+        recorder,
+        Rect.fromLTWH(0, 0, logicalSize.width, logicalSize.height),
+      )..scale(pixelRatio);
+      paintFullSceneForRaster(exportCanvas, logicalSize, _drawing);
+      picture = recorder.endRecording();
+      image = await picture.toImage(pixelWidth, pixelHeight);
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (png == null) return null;
+      return Uint8List.fromList(
+        png.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('High-resolution artwork capture failed: $error\\n$stackTrace');
+      if (mounted) _showMessage(AppLocalizations.of(context).translate('save_failed'));
+      return null;
+    } finally {
+      image?.dispose();
+      picture?.dispose();
+    }
+  }
+
+  Future<void> _exportArtworkPdf() async {
+    if (!await _promptParentalGate() || !mounted) return;
+    if (!_subscription.isAdFree) {
+      await _showPremiumOffer();
+      if (!_subscription.isAdFree || !mounted) return;
+    }
+    final png = await _captureArtworkPng();
+    if (png == null || !mounted) return;
+
+    final document = pw.Document();
+    final image = pw.MemoryImage(png);
+    document.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        build: (context) => pw.Center(
+          child: pw.Image(image, fit: pw.BoxFit.contain),
+        ),
+      ),
+    );
+    final pdfBytes = await document.save();
+    final fileName = 'vibesync-artwork-${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Print-ready artwork PDF'),
+        content: const Text('Choose how to use the A4 PDF sheet.'),
+        actions: <Widget>[
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop('cancel'), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop('share'), child: const Text('Share PDF')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop('print'), child: const Text('Print')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop('save'), child: const Text('Save PDF')),
+        ],
+      ),
+    );
+    if (!mounted || choice == null || choice == 'cancel') return;
+    try {
+      if (choice == 'save') {
+        final savedPath = await FilePicker.saveFile(
+          dialogTitle: 'Save VibeSync artwork PDF',
+          fileName: fileName,
+          bytes: pdfBytes,
+        );
+        if (savedPath != null && mounted) _showMessage('PDF saved to the selected location.');
+      } else if (choice == 'print') {
+        await Printing.layoutPdf(
+          name: fileName,
+          onLayout: (format) async => pdfBytes,
+        );
+      } else {
+        await Printing.sharePdf(bytes: pdfBytes, filename: fileName);
+      }
+    } catch (error, stackTrace) {
+      debugPrint('PDF export failed: $error\\n$stackTrace');
+      if (mounted) _showMessage('Could not export the PDF. Please try again.');
+    }
+  }
+
+  Future<void> _backupArtwork() async {
+    if (!await _promptParentalGate() || !mounted) return;
+    if (!_subscription.isAdFree) {
+      await _showPremiumOffer();
+      if (!_subscription.isAdFree || !mounted) return;
+    }
+    try {
+      final bytes = await _persistence.exportBackup(_drawing);
+      final savedPath = await FilePicker.saveFile(
+        dialogTitle: 'Save VibeSync artwork backup',
+        fileName: 'vibesync-artwork-backup-${DateTime.now().millisecondsSinceEpoch}.json',
+        bytes: bytes,
+      );
+      if (savedPath != null && mounted) {
+        _showMessage('Backup saved. Keep it in device storage or a parent-selected cloud folder.');
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Artwork backup failed: $error\\n$stackTrace');
+      if (mounted) _showMessage('Could not create the backup. Please try again.');
+    }
+  }
+
+  Future<void> _restoreArtworkBackup() async {
+    if (!await _promptParentalGate() || !mounted) return;
+    if (!_subscription.isAdFree) {
+      await _showPremiumOffer();
+      if (!_subscription.isAdFree || !mounted) return;
+    }
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const <String>['json'],
+        withData: true,
+        allowMultiple: false,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final selected = result.files.single;
+      final bytes = selected.bytes ??
+          (selected.path == null ? null : await File(selected.path!).readAsBytes());
+      if (bytes == null) throw StateError('The selected backup could not be read.');
+      await _persistence.restoreBackup(bytes, _drawing);
+      await _saveDrawing();
+      if (mounted) _showMessage('Artwork backup restored.');
+    } catch (error, stackTrace) {
+      debugPrint('Artwork restore failed: $error\\n$stackTrace');
+      if (mounted) _showMessage('That backup could not be restored. The current artwork was kept when validation failed.');
+    }
+  }
+
   Future<void> _launchCoffeeSupport() async {
     final uri = Uri.tryParse(_coffeeSupportUrl);
     if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
@@ -511,6 +863,14 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
 
   Future<void> _requestColoringPage(ColoringPage page) async {
     if (page == _drawing.selectedPage) return;
+    if (page.requiresSubscription) {
+      if (!_subscription.isAdFree) {
+        await _showPremiumOffer();
+        if (!_subscription.isAdFree || !mounted) return;
+      }
+      _drawing.setSelectedPage(page);
+      return;
+    }
     if (_unlockedPages.contains(page)) {
       _drawing.setSelectedPage(page);
       return;
@@ -558,71 +918,34 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
       ColoringPage.sunshine => strings.translate('sunshine'),
       ColoringPage.rocket => strings.translate('rocket'),
       ColoringPage.unicorn => strings.translate('unicorn'),
+      ColoringPage.dinosaur => 'Dinosaur (Premium)',
+      ColoringPage.butterfly => 'Butterfly (Premium)',
+      ColoringPage.castle => 'Castle (Premium)',
     };
   }
 
 
   Future<void> _saveArtwork() async {
-    // Sharing is an external action, so it is available only after the parent gate.
+    // Sharing artwork is an external action available only after the parent gate.
     if (!await _promptParentalGate() || !mounted) return;
-    final strings = AppLocalizations.of(context);
-    final renderObject = _canvasKey.currentContext?.findRenderObject();
-    if (renderObject is! RenderBox || renderObject.size.isEmpty) {
-      _showMessage(strings.translate('save_failed'));
+    final png = await _captureArtworkPng();
+    if (png == null || !mounted) {
+      _showMessage(AppLocalizations.of(context).translate('save_failed'));
       return;
     }
-
-    final logicalSize = renderObject.size;
-    const pixelRatio = 1.5;
-    final pixelWidth = (logicalSize.width * pixelRatio).ceil();
-    final pixelHeight = (logicalSize.height * pixelRatio).ceil();
-    if (pixelWidth <= 0 ||
-        pixelHeight <= 0 ||
-        pixelWidth > 4096 ||
-        pixelHeight > 4096 ||
-        pixelWidth * pixelHeight > DrawingController.maxRasterPixels) {
-      _showMessage(strings.translate('save_too_large'));
-      return;
-    }
-
-    ui.Picture? picture;
-    ui.Image? image;
     try {
-      final recorder = ui.PictureRecorder();
-      final exportCanvas = Canvas(
-        recorder,
-        Rect.fromLTWH(0, 0, logicalSize.width, logicalSize.height),
-      )..scale(pixelRatio);
-      paintFullSceneForRaster(exportCanvas, logicalSize, _drawing);
-      picture = recorder.endRecording();
-      image = await picture.toImage(pixelWidth, pixelHeight);
-      final png = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (png == null) {
-        _showMessage(strings.translate('save_failed'));
-        return;
-      }
-
       final directory = await getTemporaryDirectory();
-      final filename = 'vibesync-drawing-' +
-          DateTime.now().millisecondsSinceEpoch.toString() +
-          '.png';
+      final filename = 'vibesync-drawing-${DateTime.now().millisecondsSinceEpoch}.png';
       final file = File(directory.path + Platform.pathSeparator + filename);
-      await file.writeAsBytes(
-        png.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes),
-        flush: true,
-      );
-
+      await file.writeAsBytes(png, flush: true);
       await Share.shareXFiles(
         <XFile>[XFile(file.path)],
-        text: strings.translate('share_caption'),
-        subject: strings.translate('app_title'),
+        text: AppLocalizations.of(context).translate('share_caption'),
+        subject: AppLocalizations.of(context).translate('app_title'),
       );
     } catch (error, stackTrace) {
       debugPrint('Artwork export failed safely: $error\\n$stackTrace');
-      if (mounted) _showMessage(strings.translate('save_failed'));
-    } finally {
-      image?.dispose();
-      picture?.dispose();
+      if (mounted) _showMessage(AppLocalizations.of(context).translate('save_failed'));
     }
   }
 
@@ -707,7 +1030,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
   }
 
   Widget _buildToolbar(AppLocalizations strings) {
-    const palette = <Color>[
+    final palette = <Color>[
       Color(0xFFE53935),
       Color(0xFFFB8C00),
       Color(0xFFFFD600),
@@ -716,6 +1039,16 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
       Color(0xFF8E24AA),
       Color(0xFFEC407A),
       Color(0xFF212121),
+      if (_subscription.isAdFree) ...<Color>[
+        Color(0xFF00BCD4),
+        Color(0xFF7C4DFF),
+        Color(0xFFAD1457),
+        Color(0xFF00897B),
+        Color(0xFFFF6F00),
+        Color(0xFF6D4C41),
+        Color(0xFF3949AB),
+        Color(0xFF9E9E9E),
+      ],
     ];
 
     return AnimatedBuilder(
@@ -762,7 +1095,12 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                       DropdownMenuItem(value: StrokeStyle.rainbow, child: Text(strings.translate('rainbow'))),
                     ],
                     onChanged: (value) {
-                      if (value != null) _drawing.setBrushStyle(value);
+                      if (value == null) return;
+                      if (value.requiresSubscription && !_subscription.isAdFree) {
+                        unawaited(_unlockPremiumBrush(value));
+                      } else {
+                        _drawing.setBrushStyle(value);
+                      }
                     },
                   ),
                   const SizedBox(width: 8),
@@ -849,6 +1187,15 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                             ),
                           ),
                         ),
+                      ),
+                    ),
+                  if (!_subscription.isAdFree)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: ActionChip(
+                        avatar: const Icon(Icons.lock_outline, size: 16),
+                        label: const Text('More colors'),
+                        onPressed: _showPremiumOffer,
                       ),
                     ),
                   if (_drawing.activeTool == ActiveTool.stamp)
@@ -968,6 +1315,9 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
   }
 
   Widget _buildAdDock(AppLocalizations strings) {
+    if (!_subscriptionReady || _subscription.isAdFree) {
+      return const SizedBox.shrink();
+    }
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
@@ -1098,7 +1448,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                 ),
               ),
             ),
-            _buildAdDock(strings),
+            if (_subscriptionReady && !_subscription.isAdFree) _buildAdDock(strings),
             ],
             ),
             if (_restoringDrawing)
@@ -1146,6 +1496,8 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
     }
     _internetSubscription?.cancel();
     _updateSubscription?.cancel();
+    _subscription.removeListener(_onSubscriptionChanged);
+    _subscription.dispose();
     _bannerAd?.dispose();
     super.dispose();
   }

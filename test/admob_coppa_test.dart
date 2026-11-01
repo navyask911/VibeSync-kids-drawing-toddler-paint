@@ -41,6 +41,21 @@ void main() {
       expect(identical(instance1, instance2), isTrue);
     });
 
+    test('premium entitlement disables interstitial delivery', () {
+      final adHelper = AdHelper.instance;
+      var wasSuppressed = false;
+      var closed = false;
+      adHelper.setAdsEnabled(false);
+      adHelper.showInterstitialAd(
+        isDrawingActive: false,
+        onAdClosed: () => closed = true,
+        onAdSuppressed: (reason) => wasSuppressed = reason.contains('subscriber'),
+      );
+      expect(wasSuppressed, isTrue);
+      expect(closed, isTrue);
+      adHelper.setAdsEnabled(true);
+    });
+
     test('Active drawing stroke strictly suppresses interstitial ads', () {
       final adHelper = AdHelper.instance;
       bool wasSuppressed = false;

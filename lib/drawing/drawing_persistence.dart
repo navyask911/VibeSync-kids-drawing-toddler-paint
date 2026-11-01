@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,6 +12,11 @@ import 'drawing_models.dart';
 
 /// Versioned, bounded app-private autosave. Artwork is never uploaded.
 class DrawingPersistence {
+  DrawingPersistence({Future<Directory> Function()? documentsDirectory})
+      : _documentsDirectory =
+            documentsDirectory ?? getApplicationDocumentsDirectory;
+
+  final Future<Directory> Function() _documentsDirectory;
   static const int _version = 1;
   static const int _maxFileBytes = 20 * 1024 * 1024;
   static const int _maxStrokes = 5000;
@@ -21,7 +27,7 @@ class DrawingPersistence {
   Future<void> _writeQueue = Future<void>.value();
 
   Future<File> _file() async {
-    final directory = await getApplicationDocumentsDirectory();
+    final directory = await _documentsDirectory();
     return File('${directory.path}${Platform.pathSeparator}vibesync_drawing_autosave_v1.json');
   }
 
@@ -38,22 +44,21 @@ class DrawingPersistence {
     return result.future;
   }
 
-  Future<void> _saveNow(DrawingController controller) async {
+  /// Encode the current drawing in a bounded, versioned JSON backup.
+  Future<Uint8List> exportBackup(DrawingController controller) async {
     final strokes = controller.strokes.toList(growable: false);
     final stamps = controller.stamps.toList(growable: false);
     final fills = controller.fills.toList(growable: false);
     if (strokes.length > _maxStrokes || stamps.length > _maxStamps) {
-      throw StateError('Drawing exceeds the safe autosave item limit.');
+      throw StateError('Drawing exceeds the safe backup item limit.');
     }
-
     var pointCount = 0;
     for (final stroke in strokes) {
       pointCount += stroke.points.length;
       if (pointCount > _maxPoints) {
-        throw StateError('Drawing exceeds the safe autosave point limit.');
+        throw StateError('Drawing exceeds the safe backup point limit.');
       }
     }
-
     final snapshot = <String, Object?>{
       'version': _version,
       // ignore: deprecated_member_use
@@ -75,14 +80,19 @@ class DrawingPersistence {
       'stamps': stamps.map(_encodeStamp).toList(growable: false),
       'fills': await Future.wait(fills.map(_encodeFill)),
     };
-    final bytes = utf8.encode(jsonEncode(snapshot));
+    final bytes = Uint8List.fromList(utf8.encode(jsonEncode(snapshot)));
     if (bytes.length > _maxFileBytes) {
-      throw StateError('Drawing autosave exceeds the safe file-size limit.');
+      throw StateError('Drawing backup exceeds the safe file-size limit.');
     }
+    return bytes;
+  }
 
+  Future<void> _saveNow(DrawingController controller) async {
+    final bytes = await exportBackup(controller);
     final file = await _file();
     await file.parent.create(recursive: true);
-    final temporary = File('${file.path}.${DateTime.now().microsecondsSinceEpoch}.tmp');
+    final temporary =
+        File('${file.path}.${DateTime.now().microsecondsSinceEpoch}.tmp');
     await temporary.writeAsBytes(bytes, flush: true);
     try {
       await temporary.rename(file.path);
@@ -135,82 +145,91 @@ class DrawingPersistence {
   Future<bool> restore(DrawingController controller) async {
     final file = await _file();
     if (!await file.exists()) return false;
-    final length = await file.length();
-    if (length <= 0 || length > _maxFileBytes) {
-      throw const FormatException('Autosave is outside the accepted size range.');
+    return restoreBackup(await file.readAsBytes(), controller);
+  }
+
+  /// Restore a selected backup after validating its format and size limits.
+  Future<bool> restoreBackup(
+    Uint8List bytes,
+    DrawingController controller,
+  ) async {
+    if (bytes.isEmpty || bytes.length > _maxFileBytes) {
+      throw const FormatException('Backup is outside the accepted size range.');
     }
-    final decoded = jsonDecode(await file.readAsString());
+    final decoded = jsonDecode(utf8.decode(bytes));
     if (decoded is! Map<String, dynamic> || decoded['version'] != _version) {
-      throw const FormatException('Autosave format is not supported.');
+      throw const FormatException('Backup format is not supported.');
     }
 
-    final strokes = _decodeStrokes(decoded['strokes']);
-    final stamps = _decodeStamps(decoded['stamps']);
-    final fills = <CanvasFill>[];
-    var totalFillPixels = 0;
-    var ownershipTransferred = false;
-    try {
-      final rawFills = decoded['fills'];
-      if (rawFills is! List || rawFills.length > DrawingController.maxFillLayers) {
-        throw const FormatException('Invalid saved fill collection.');
-      }
-      for (final raw in rawFills) {
-        if (raw is! Map<String, dynamic> || raw['pngBase64'] is! String) {
-          throw const FormatException('Invalid saved fill image.');
-        }
-        final png = base64Decode(raw['pngBase64'] as String);
-        if (png.isEmpty || png.length > _maxFileBytes) {
-          throw const FormatException('Saved fill image is outside size limits.');
-        }
-        final codec = await ui.instantiateImageCodec(png);
+    
+    
+        final strokes = _decodeStrokes(decoded['strokes']);
+        final stamps = _decodeStamps(decoded['stamps']);
+        final fills = <CanvasFill>[];
+        var totalFillPixels = 0;
+        var ownershipTransferred = false;
         try {
-          final frame = await codec.getNextFrame();
-          final image = frame.image;
-          final pixels = image.width * image.height;
-          totalFillPixels += pixels;
-          if (image.width <= 0 ||
-              image.height <= 0 ||
-              pixels > DrawingController.maxRasterPixels ||
-              totalFillPixels > _maxTotalFillPixels) {
-            image.dispose();
-            throw const FormatException('Saved fill image exceeds pixel limits.');
+          final rawFills = decoded['fills'];
+          if (rawFills is! List || rawFills.length > DrawingController.maxFillLayers) {
+            throw const FormatException('Invalid saved fill collection.');
           }
-          fills.add(CanvasFill(
-            image: image,
-            logicalSize: Size(
-              _readDouble(raw['logicalWidth'], 1),
-              _readDouble(raw['logicalHeight'], 1),
-            ),
-          ));
+          for (final raw in rawFills) {
+            if (raw is! Map<String, dynamic> || raw['pngBase64'] is! String) {
+              throw const FormatException('Invalid saved fill image.');
+            }
+            final png = base64Decode(raw['pngBase64'] as String);
+            if (png.isEmpty || png.length > _maxFileBytes) {
+              throw const FormatException('Saved fill image is outside size limits.');
+            }
+            final codec = await ui.instantiateImageCodec(png);
+            try {
+              final frame = await codec.getNextFrame();
+              final image = frame.image;
+              final pixels = image.width * image.height;
+              totalFillPixels += pixels;
+              if (image.width <= 0 ||
+                  image.height <= 0 ||
+                  pixels > DrawingController.maxRasterPixels ||
+                  totalFillPixels > _maxTotalFillPixels) {
+                image.dispose();
+                throw const FormatException('Saved fill image exceeds pixel limits.');
+              }
+              fills.add(CanvasFill(
+                image: image,
+                logicalSize: Size(
+                  _readDouble(raw['logicalWidth'], 1),
+                  _readDouble(raw['logicalHeight'], 1),
+                ),
+              ));
+            } finally {
+              codec.dispose();
+            }
+          }
+    
+          controller.restoreSnapshot(
+            strokes: strokes,
+            stamps: stamps,
+            fills: fills,
+            restoredBackgroundColor: Color(_readColor(decoded['backgroundColor'], 0xFFFFFFFF)),
+            restoredBrushColor: Color(_readColor(decoded['brushColor'], 0xFFE64A19)),
+            restoredBucketColor: Color(_readColor(decoded['bucketColor'], 0xFF80DEEA)),
+            restoredStampFillColor: Color(_readColor(decoded['stampFillColor'], 0xFFFFD54F)),
+            restoredStampStrokeColor: Color(_readColor(decoded['stampStrokeColor'], 0xFF5D4037)),
+            restoredBrushWidth: _readDouble(decoded['brushWidth'], 6),
+            restoredBrushStyle: _readEnum(StrokeStyle.values, decoded['brushStyle'], StrokeStyle.solid),
+            restoredActiveTool: _readEnum(ActiveTool.values, decoded['activeTool'], ActiveTool.brush),
+            restoredSelectedStamp: _readEnum(StampKind.values, decoded['selectedStamp'], StampKind.flower),
+            restoredSelectedPage: _readEnum(ColoringPage.values, decoded['selectedPage'], ColoringPage.freeDraw),
+          );
+          ownershipTransferred = true;
+          return true;
         } finally {
-          codec.dispose();
+          if (!ownershipTransferred) {
+            for (final fill in fills) {
+              fill.image.dispose();
+            }
+          }
         }
-      }
-
-      controller.restoreSnapshot(
-        strokes: strokes,
-        stamps: stamps,
-        fills: fills,
-        restoredBackgroundColor: Color(_readColor(decoded['backgroundColor'], 0xFFFFFFFF)),
-        restoredBrushColor: Color(_readColor(decoded['brushColor'], 0xFFE64A19)),
-        restoredBucketColor: Color(_readColor(decoded['bucketColor'], 0xFF80DEEA)),
-        restoredStampFillColor: Color(_readColor(decoded['stampFillColor'], 0xFFFFD54F)),
-        restoredStampStrokeColor: Color(_readColor(decoded['stampStrokeColor'], 0xFF5D4037)),
-        restoredBrushWidth: _readDouble(decoded['brushWidth'], 6),
-        restoredBrushStyle: _readEnum(StrokeStyle.values, decoded['brushStyle'], StrokeStyle.solid),
-        restoredActiveTool: _readEnum(ActiveTool.values, decoded['activeTool'], ActiveTool.brush),
-        restoredSelectedStamp: _readEnum(StampKind.values, decoded['selectedStamp'], StampKind.flower),
-        restoredSelectedPage: _readEnum(ColoringPage.values, decoded['selectedPage'], ColoringPage.freeDraw),
-      );
-      ownershipTransferred = true;
-      return true;
-    } finally {
-      if (!ownershipTransferred) {
-        for (final fill in fills) {
-          fill.image.dispose();
-        }
-      }
-    }
   }
 
   List<AdvancedStroke> _decodeStrokes(Object? value) {

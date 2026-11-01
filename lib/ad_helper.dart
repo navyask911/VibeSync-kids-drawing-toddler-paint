@@ -16,6 +16,23 @@ class AdHelper {
   // Initialization flag
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
+  bool _adsEnabled = true;
+  bool get adsEnabled => _adsEnabled;
+
+  /// Immediately disables all ad formats for an active ad-free subscriber.
+  void setAdsEnabled(bool enabled) {
+    if (_adsEnabled == enabled) return;
+    _adsEnabled = enabled;
+    if (!enabled) {
+      _rewardedAd?.dispose();
+      _rewardedAd = null;
+      _interstitialAd?.dispose();
+      _interstitialAd = null;
+    } else if (_isInitialized) {
+      loadRewardedAd();
+      loadInterstitialAd();
+    }
+  }
 
   // Active ad instances
   RewardedAd? _rewardedAd;
@@ -112,8 +129,8 @@ class AdHelper {
 
     // Preload only formats with a configured unit ID. In release builds, test
     // IDs are deliberately not substituted for missing production credentials.
-    if (hasRewardedAdConfigured) loadRewardedAd();
-    if (hasInterstitialAdConfigured) loadInterstitialAd();
+    if (_adsEnabled && hasRewardedAdConfigured) loadRewardedAd();
+    if (_adsEnabled && hasInterstitialAdConfigured) loadInterstitialAd();
   }
 
   // ---------------------------------------------------------------------------
@@ -166,7 +183,7 @@ class AdHelper {
   // ---------------------------------------------------------------------------
   /// Preloads a Rewarded Ad for unlocking bonus coloring sheets.
   void loadRewardedAd() {
-    if (!hasRewardedAdConfigured || _isRewardedAdLoading || _rewardedAd != null) return;
+    if (!_adsEnabled || !hasRewardedAdConfigured || _isRewardedAdLoading || _rewardedAd != null) return;
     _isRewardedAdLoading = true;
 
     RewardedAd.load(
@@ -195,6 +212,10 @@ class AdHelper {
     required void Function() onAdClosed,
     void Function(String message)? onAdNotReady,
   }) {
+    if (!_adsEnabled) {
+      onAdNotReady?.call('Ads are disabled for this subscriber.');
+      return;
+    }
     if (_rewardedAd == null) {
       debugPrint('AdHelper: Rewarded ad not ready. Reloading...');
       loadRewardedAd();
@@ -235,7 +256,7 @@ class AdHelper {
   // ---------------------------------------------------------------------------
   /// Preloads an Interstitial Ad for transitions between coloring albums.
   void loadInterstitialAd() {
-    if (!hasInterstitialAdConfigured ||
+    if (!_adsEnabled || !hasInterstitialAdConfigured ||
         _isInterstitialAdLoading ||
         _interstitialAd != null) {
       return;
@@ -268,6 +289,13 @@ class AdHelper {
     required void Function() onAdClosed,
     void Function(String reason)? onAdSuppressed,
   }) {
+    // Subscribers never receive interstitial ads.
+    if (!_adsEnabled) {
+      onAdSuppressed?.call('Ads are disabled for this subscriber.');
+      onAdClosed();
+      return;
+    }
+
     // CRITICAL TODDLER SAFETY RULE:
     // Never show an interstitial ad while child has finger down or mid-stroke
     if (isDrawingActive) {

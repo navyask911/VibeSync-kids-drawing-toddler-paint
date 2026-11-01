@@ -16,7 +16,18 @@ enum ActiveTool { brush, paintBucket, stamp }
 
 enum StampKind { house, flower, pond, fish }
 
-enum ColoringPage { freeDraw, puppy, sunshine, rocket, unicorn }
+enum ColoringPage { freeDraw, puppy, sunshine, rocket, unicorn, dinosaur, butterfly, castle }
+
+extension PremiumDrawingAccess on ColoringPage {
+  bool get requiresSubscription => switch (this) {
+        ColoringPage.dinosaur || ColoringPage.butterfly || ColoringPage.castle => true,
+        _ => false,
+      };
+}
+
+extension PremiumBrushAccess on StrokeStyle {
+  bool get requiresSubscription => this != StrokeStyle.solid;
+}
 
 class AdvancedStroke {
   AdvancedStroke({

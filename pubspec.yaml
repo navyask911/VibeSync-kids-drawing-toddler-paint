@@ -1,10 +1,10 @@
 name: kids_drawing_toddler_paint
 description: "VibeSync Kids Drawing Toddler Paint with child-directed AdMob settings"
 publish_to: "none"
-version: 1.0.5+20261024
+version: 1.0.6+20261025
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  sdk: ">=3.12.0 <4.0.0"
   flutter: ">=3.24.0"
 
 dependencies:
@@ -18,6 +18,10 @@ dependencies:
   url_launcher: ^6.3.2
   path_provider: ^2.1.5
   share_plus: ^10.1.4
+  in_app_purchase: ^3.3.1
+  file_picker: ^11.0.3
+  pdf: ^3.13.1
+  printing: ^5.15.1
 
   # Google Mobile Ads official Flutter plugin
   google_mobile_ads: 9.2.0

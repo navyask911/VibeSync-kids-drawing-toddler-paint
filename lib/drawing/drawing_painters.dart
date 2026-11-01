@@ -408,6 +408,82 @@ void _drawColoringTemplate(Canvas canvas, Size size, ColoringPage page) {
       canvas.drawCircle(const Offset(-24, -4), 5, Paint()..color = const Color(0xFF64748B));
       canvas.drawArc(const Rect.fromLTRB(-18, 5, 18, 32), 0.15, math.pi - 0.3, false, line);
       break;
+    case ColoringPage.dinosaur:
+      final body = Path()
+        ..moveTo(-86, 40)
+        ..lineTo(-78, 2)
+        ..lineTo(-45, -20)
+        ..lineTo(-24, -62)
+        ..lineTo(2, -42)
+        ..lineTo(38, -30)
+        ..lineTo(70, -4)
+        ..lineTo(60, 24)
+        ..lineTo(40, 30)
+        ..lineTo(36, 62)
+        ..lineTo(14, 62)
+        ..lineTo(10, 32)
+        ..lineTo(-36, 32)
+        ..lineTo(-42, 62)
+        ..lineTo(-64, 62)
+        ..lineTo(-58, 31)
+        ..close();
+      canvas.drawPath(body, softFill);
+      canvas.drawPath(body, line);
+      canvas.drawCircle(const Offset(42, -12), 5, Paint()..color = const Color(0xFF64748B));
+      canvas.drawPath(
+        Path()
+          ..moveTo(-24, -54)
+          ..lineTo(-14, -82)
+          ..lineTo(-2, -55)
+          ..moveTo(2, -43)
+          ..lineTo(18, -72)
+          ..lineTo(24, -34),
+        line,
+      );
+      break;
+    case ColoringPage.butterfly:
+      canvas.drawOval(const Rect.fromLTRB(-108, -86, -8, 4), softFill);
+      canvas.drawOval(const Rect.fromLTRB(-108, -86, -8, 4), line);
+      canvas.drawOval(const Rect.fromLTRB(8, -86, 108, 4), softFill);
+      canvas.drawOval(const Rect.fromLTRB(8, -86, 108, 4), line);
+      canvas.drawOval(const Rect.fromLTRB(-92, 0, -8, 82), softFill);
+      canvas.drawOval(const Rect.fromLTRB(-92, 0, -8, 82), line);
+      canvas.drawOval(const Rect.fromLTRB(8, 0, 92, 82), softFill);
+      canvas.drawOval(const Rect.fromLTRB(8, 0, 92, 82), line);
+      canvas.drawOval(const Rect.fromLTRB(-9, -48, 9, 48), line);
+      canvas.drawCircle(const Offset(0, -54), 10, line);
+      canvas.drawPath(
+        Path()
+          ..moveTo(0, -58)
+          ..quadraticBezierTo(-38, -104, -48, -94)
+          ..moveTo(0, -58)
+          ..quadraticBezierTo(38, -104, 48, -94),
+        line,
+      );
+      break;
+    case ColoringPage.castle:
+      final wall = Path()..addRect(const Rect.fromLTRB(-74, -20, 74, 86));
+      final leftTower = Path()..addRect(const Rect.fromLTRB(-112, -74, -62, 86));
+      final rightTower = Path()..addRect(const Rect.fromLTRB(62, -74, 112, 86));
+      canvas.drawPath(wall, softFill);
+      canvas.drawPath(wall, line);
+      canvas.drawPath(leftTower, softFill);
+      canvas.drawPath(leftTower, line);
+      canvas.drawPath(rightTower, softFill);
+      canvas.drawPath(rightTower, line);
+      canvas.drawPath(
+        Path()
+          ..moveTo(-112, -74)
+          ..lineTo(-87, -112)
+          ..lineTo(-62, -74)
+          ..moveTo(62, -74)
+          ..lineTo(87, -112)
+          ..lineTo(112, -74),
+        line,
+      );
+      canvas.drawArc(const Rect.fromLTRB(-28, 32, 28, 100), math.pi, math.pi, false, line);
+      canvas.drawRect(const Rect.fromLTRB(-10, -4, 10, 18), line);
+      break;
   }
 
   canvas.restore();
