@@ -12,8 +12,8 @@ if (localPropertiesFile.exists()) {
     }
 }
 
-def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "20261026"
-def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.7"
+def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "20261027"
+def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.8"
 
 // -----------------------------------------------------------------------------
 // SECURE KEYSTORE SIGNATURE LOADING
@@ -48,11 +48,11 @@ android {
 
     defaultConfig {
         applicationId "com.navya.kids_drawing_studio"
-        // Google Play Billing and the supported in_app_purchase stack require API 24+.
+        // Google Play Billing 9.1.0 supports API 23+; Flutter's Android floor is API 24.
         minSdkVersion 24
         targetSdkVersion 36
-        versionCode 20261026
-        versionName "1.0.7"
+        versionCode 20261027
+        versionName "1.0.8"
         multiDexEnabled true
     }
 

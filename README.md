@@ -75,10 +75,10 @@ GitHub Actions performs dependency resolution, launcher generation, Flutter test
 
 ## Release version
 
-Current candidate: **1.0.7 (versionCode 20261026)**, represented by:
+Current candidate: **1.0.8 (versionCode 20261027)**, represented by:
 
 ```yaml
-version: 1.0.7+20261026
+version: 1.0.8+20261027
 ```
 
 The same values must be reflected in `android/app/build.gradle`. Verify the version code has not already been used in Play Console before uploading.
