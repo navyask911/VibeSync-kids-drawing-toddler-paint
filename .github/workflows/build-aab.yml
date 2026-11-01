@@ -28,6 +28,7 @@ jobs:
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PUSH_BASE_SHA: ${{ github.event.before }}
+          FORCE_RELEASE_VERSION_CHECK: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
         run: |
           set -euo pipefail
           CURRENT_VERSION="$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '"')"
@@ -60,8 +61,25 @@ jobs:
           fi
           echo "Base version code: $BASE_CODE"
           echo "Candidate version code: $CURRENT_CODE"
+
+          # Static-site-only commits must not be forced to consume a new Play
+          # version code. Release-relevant Flutter/Android changes still must
+          # increase the code, and an explicitly requested release always does.
+          BUILD_INPUTS_CHANGED="$(git diff --name-only "$BASE_SHA" HEAD -- pubspec.yaml pubspec.lock lib android assets test)"
+          if [[ -z "$BUILD_INPUTS_CHANGED" && "$FORCE_RELEASE_VERSION_CHECK" != "true" ]]; then
+            echo "No Flutter/Android build inputs changed; skipping only the version-code monotonicity check."
+            exit 0
+          fi
+
+          if [[ -n "$BUILD_INPUTS_CHANGED" ]]; then
+            echo "Flutter/Android build inputs changed:"
+            printf '%s\\n' "$BUILD_INPUTS_CHANGED"
+          else
+            echo "Explicit release requested; enforcing version-code monotonicity."
+          fi
+
           if (( CURRENT_CODE <= BASE_CODE )); then
-            echo "::error::Version code must increase for each release candidate."
+            echo "::error::Version code must increase when Flutter/Android build inputs change or a release is explicitly requested."
             exit 1
           fi
 
