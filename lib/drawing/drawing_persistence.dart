@@ -76,6 +76,15 @@ class DrawingPersistence {
       'activeTool': controller.activeTool.name,
       'selectedStamp': controller.selectedStamp.name,
       'selectedPage': controller.selectedPage.name,
+      'activeLayerId': controller.activeLayerId,
+      'symmetryMode': controller.symmetryMode.name,
+      'studioMode': controller.studioMode.name,
+      'layers': controller.layers.map((layer) => <String, Object?>{
+        'id': layer.id,
+        'name': layer.name,
+        'opacity': layer.opacity,
+        'visible': layer.visible,
+      }).toList(growable: false),
       'strokes': strokes.map(_encodeStroke).toList(growable: false),
       'stamps': stamps.map(_encodeStamp).toList(growable: false),
       'fills': await Future.wait(fills.map(_encodeFill)),
@@ -109,6 +118,9 @@ class DrawingPersistence {
         'color': stroke.color.value,
         'width': stroke.width,
         'order': stroke.order,
+        'layerId': stroke.layerId,
+        'createdAt': stroke.createdAt.toIso8601String(),
+        'pressureSamples': stroke.pressureSamples,
       };
 
   Map<String, Object?> _encodeStamp(CanvasStamp stamp) => <String, Object?>{
@@ -123,6 +135,7 @@ class DrawingPersistence {
         'strokeColor': stamp.strokeColor.value,
         'layerCategory': stamp.layerCategory.name,
         'order': stamp.order,
+        'layerId': stamp.layerId,
       };
 
   Future<Map<String, Object?>> _encodeFill(CanvasFill fill) async {
@@ -136,6 +149,7 @@ class DrawingPersistence {
         'pngBase64': base64Encode(png),
         'logicalWidth': fill.logicalSize.width,
         'logicalHeight': fill.logicalSize.height,
+        'layerId': fill.layerId,
       };
     } finally {
       image.dispose();
@@ -200,6 +214,7 @@ class DrawingPersistence {
                   _readDouble(raw['logicalWidth'], 1),
                   _readDouble(raw['logicalHeight'], 1),
                 ),
+                layerId: _readInt(raw['layerId'], 1),
               ));
             } finally {
               codec.dispose();
@@ -220,6 +235,18 @@ class DrawingPersistence {
             restoredActiveTool: _readEnum(ActiveTool.values, decoded['activeTool'], ActiveTool.brush),
             restoredSelectedStamp: _readEnum(StampKind.values, decoded['selectedStamp'], StampKind.flower),
             restoredSelectedPage: _readEnum(ColoringPage.values, decoded['selectedPage'], ColoringPage.freeDraw),
+            restoredLayers: _decodeLayers(decoded['layers']),
+            restoredActiveLayerId: _readInt(decoded['activeLayerId'], 1),
+            restoredSymmetryMode: _readEnum(
+              SymmetryMode.values,
+              decoded['symmetryMode'],
+              SymmetryMode.none,
+            ),
+            restoredStudioMode: _readEnum(
+              StudioMode.values,
+              decoded['studioMode'],
+              StudioMode.toddler,
+            ),
           );
           ownershipTransferred = true;
           return true;
@@ -265,6 +292,16 @@ class DrawingPersistence {
         color: Color(_readColor(raw['color'], 0xFFE64A19)),
         width: _readDouble(raw['width'], 6).clamp(1.0, 48.0).toDouble(),
         order: _readInt(raw['order'], result.length),
+        layerId: _readInt(raw['layerId'], 1),
+        createdAt: raw['createdAt'] is String
+            ? DateTime.tryParse(raw['createdAt'] as String)?.toUtc()
+            : null,
+        pressureSamples: raw['pressureSamples'] is List
+            ? (raw['pressureSamples'] as List)
+                .whereType<num>()
+                .take(_maxPoints)
+                .map((sample) => sample.toDouble().clamp(0.1, 1.0).toDouble())
+            : null,
       ));
     }
     return result;
@@ -287,8 +324,39 @@ class DrawingPersistence {
         strokeColor: Color(_readColor(raw['strokeColor'], 0xFF5D4037)),
         layerCategory: _readEnum(LayerCategory.values, raw['layerCategory'], LayerCategory.foregroundFlora),
         order: _readInt(raw['order'], 0),
+        layerId: _readInt(raw['layerId'], 1),
       );
     }).toList(growable: false);
+  }
+
+
+  List<DrawingLayer>? _decodeLayers(Object? value) {
+    if (value == null) return null;
+    if (value is! List || value.isEmpty || value.length > 12) {
+      throw const FormatException('Invalid saved layer collection.');
+    }
+    final layers = <DrawingLayer>[];
+    final seen = <int>{};
+    for (final raw in value) {
+      if (raw is! Map<String, dynamic>) {
+        throw const FormatException('Invalid saved layer.');
+      }
+      final id = _readInt(raw['id'], -1);
+      if (id <= 0 || !seen.add(id)) {
+        throw const FormatException('Saved layer IDs must be unique and positive.');
+      }
+      final rawName = raw['name'];
+      final name = rawName is String && rawName.trim().isNotEmpty
+          ? rawName.trim().substring(0, rawName.trim().length.clamp(0, 32).toInt())
+          : 'Layer ${layers.length + 1}';
+      layers.add(DrawingLayer(
+        id: id,
+        name: name,
+        opacity: _readDouble(raw['opacity'], 1).clamp(0.0, 1.0).toDouble(),
+        visible: raw['visible'] != false,
+      ));
+    }
+    return layers;
   }
 
   T _readEnum<T extends Enum>(List<T> values, Object? value, T fallback) {

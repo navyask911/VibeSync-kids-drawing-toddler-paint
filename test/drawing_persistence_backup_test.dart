@@ -27,8 +27,9 @@ void main() {
 
     test('backup round-trip preserves strokes and canvas preferences', () async {
       controller.setBrushColor(Colors.purple);
-      controller.beginStroke(const Offset(10, 12));
-      controller.appendActivePoint(const Offset(40, 52));
+      final layerId = controller.addLayer(name: 'Pressure ink')!;
+      controller.beginStroke(const Offset(10, 12), pressure: 0.25);
+      controller.appendActivePoint(const Offset(40, 52), pressure: 0.8);
       controller.finishStroke();
       controller.setBackgroundColor(Colors.lightBlue);
 
@@ -36,6 +37,7 @@ void main() {
       expect(bytes, isNotEmpty);
 
       controller.clearCanvas();
+      controller.removeLayer(layerId);
       controller.setBackgroundColor(Colors.white);
       final restored = await persistence.restoreBackup(bytes, controller);
 
@@ -43,6 +45,9 @@ void main() {
       expect(controller.strokes, hasLength(1));
       expect(controller.strokes.single.points.last, const Offset(40, 52));
       expect(controller.strokes.single.color, const Color(0xFF9C27B0));
+      expect(controller.strokes.single.layerId, layerId);
+      expect(controller.strokes.single.pressureSamples, <double>[0.25, 0.8]);
+      expect(controller.layers.map((layer) => layer.name), contains('Pressure ink'));
       expect(controller.backgroundColor, const Color(0xFF03A9F4));
     });
 

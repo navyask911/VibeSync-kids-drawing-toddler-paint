@@ -82,7 +82,7 @@ jobs:
 
           if [[ -n "$BUILD_INPUTS_CHANGED" ]]; then
             echo "Flutter/Android build inputs changed:"
-            printf '%s\\n' "$BUILD_INPUTS_CHANGED"
+            printf '%s\n' "$BUILD_INPUTS_CHANGED"
           else
             echo "Explicit release requested; enforcing version-code monotonicity."
           fi

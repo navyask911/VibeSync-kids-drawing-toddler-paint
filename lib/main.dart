@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -6,11 +7,13 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:image/image.dart' as image_codec;
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:in_app_update/in_app_update.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
@@ -26,6 +29,8 @@ import 'drawing/drawing_persistence.dart';
 import 'drawing/drawing_painters.dart';
 import 'l10n/app_localizations.dart';
 import 'subscriptions/ad_free_subscription_service.dart';
+import 'creative/ai_creative_agent.dart';
+import 'export/drawing_export_service.dart';
 
 const String _coffeeSupportUrl = String.fromEnvironment('COFFEE_SUPPORT_URL');
 
@@ -53,7 +58,7 @@ class _KidsDrawingAppState extends State<KidsDrawingApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'VibeSync Kids Drawing Toddler Paint',
+      title: 'VibeSync Kids Drawing & Creative Studio Pro',
       locale: _locale,
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
@@ -92,7 +97,9 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
   final DrawingController _drawing = DrawingController();
   final DrawingPersistence _persistence = DrawingPersistence();
   final AdFreeSubscriptionService _subscription = AdFreeSubscriptionService();
+  final AiCreativeAgent _creativeAgent = AiCreativeAgent();
   bool _subscriptionReady = false;
+  bool _chromeVisible = true;
   Timer? _autosaveTimer;
   bool _restoringDrawing = true;
   bool _autosaveInProgress = false;
@@ -157,6 +164,9 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
       }
       if (_drawing.selectedPage.requiresSubscription) {
         _drawing.setSelectedPage(ColoringPage.freeDraw);
+      }
+      if (_drawing.studioMode == StudioMode.proArtist) {
+        _drawing.setStudioMode(StudioMode.toddler);
       }
       if (_subscriptionReady && _isOnline == true && mounted) {
         unawaited(_initializeAdsIfOnline());
@@ -475,6 +485,48 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
               Text(strings.translate('parents_corner_help')),
               const SizedBox(height: 14),
               _buildSubscriptionControls(strings),
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      const Text('Studio mode',
+                          style: TextStyle(fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 4),
+                      Text(_drawing.studioMode == StudioMode.proArtist
+                          ? 'Pro Artist: layers, symmetry, advanced brushes and precision tools.'
+                          : 'Toddler: larger controls and simplified drawing.'),
+                      const SizedBox(height: 8),
+                      FilledButton.tonalIcon(
+                        onPressed: _toggleStudioMode,
+                        icon: Icon(_drawing.studioMode == StudioMode.proArtist
+                            ? Icons.child_care
+                            : Icons.brush),
+                        label: Text(_drawing.studioMode == StudioMode.proArtist
+                            ? 'Switch to Toddler Mode'
+                            : 'Unlock Pro Artist Mode'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _openCreativeAgent,
+                        icon: const Icon(Icons.auto_awesome),
+                        label: const Text('Creative Agent · 52 languages'),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        '© 2026 VibeSyncro Technologies Pvt Ltd',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 11, color: Colors.black54),
+                      ),
+                      TextButton(
+                        onPressed: _openCompanyWebsite,
+                        child: const Text('https://vibesyncro.com/'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 14),
               Text(
                 strings.translate('choose_language'),
@@ -591,6 +643,11 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                   runSpacing: 4,
                   children: <Widget>[
                     OutlinedButton.icon(
+                      onPressed: _subscription.isAdFree ? _exportArtworkPng : _showPremiumOffer,
+                      icon: const Icon(Icons.save_alt),
+                      label: const Text('Save PNG'),
+                    ),
+                    OutlinedButton.icon(
                       onPressed: _subscription.isAdFree ? _exportArtworkPdf : _showPremiumOffer,
                       icon: const Icon(Icons.picture_as_pdf),
                       label: const Text('Export / print PDF'),
@@ -604,6 +661,21 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                       onPressed: _subscription.isAdFree ? _restoreArtworkBackup : _showPremiumOffer,
                       icon: const Icon(Icons.restore),
                       label: const Text('Restore backup'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _subscription.isAdFree ? _exportArtworkJpeg : _showPremiumOffer,
+                      icon: const Icon(Icons.image_outlined),
+                      label: const Text('JPEG'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _subscription.isAdFree ? _exportArtworkSvg : _showPremiumOffer,
+                      icon: const Icon(Icons.polyline),
+                      label: const Text('SVG'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _subscription.isAdFree ? _exportTimelapseGif : _showPremiumOffer,
+                      icon: const Icon(Icons.gif_box_outlined),
+                      label: const Text('Timelapse GIF'),
                     ),
                   ],
                 ),
@@ -842,6 +914,412 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
     }
   }
 
+
+  void _toggleStudioMode() {
+    if (_drawing.studioMode == StudioMode.proArtist) {
+      _drawing.setBrushStyle(StrokeStyle.solid);
+      _drawing.setActiveTool(ActiveTool.brush);
+      _drawing.setSymmetryMode(SymmetryMode.none);
+      _drawing.setStudioMode(StudioMode.toddler);
+      return;
+    }
+    if (!_subscription.isAdFree) {
+      unawaited(_showPremiumOffer());
+      return;
+    }
+    _drawing.setStudioMode(StudioMode.proArtist);
+  }
+
+  Future<void> _toggleChrome() async {
+    await HapticFeedback.mediumImpact();
+    if (!mounted) return;
+    final showChrome = !_chromeVisible;
+    await SystemChrome.setEnabledSystemUIMode(
+      showChrome ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky,
+    );
+    if (!mounted) return;
+    setState(() => _chromeVisible = showChrome);
+  }
+
+  Future<void> _renameLayer(DrawingLayer layer) async {
+    final textController = TextEditingController(text: layer.name);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Rename layer'),
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          maxLength: 32,
+          decoration: const InputDecoration(labelText: 'Layer name'),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(textController.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    textController.dispose();
+    if (name != null) _drawing.renameLayer(layer.id, name);
+  }
+
+  Future<void> _showLayerManager() async {
+    if (!await _promptParentalGate() || !mounted) return;
+    if (!_subscription.isAdFree || _drawing.studioMode != StudioMode.proArtist) {
+      await _showPremiumOffer();
+      if (!_subscription.isAdFree || !mounted) return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(sheetContext).size.height * 0.68,
+          child: AnimatedBuilder(
+            animation: _drawing,
+            builder: (context, _) => Column(
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: <Widget>[
+                      const Expanded(
+                        child: Text('Canvas layers',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                      ),
+                      Text('${_drawing.layers.length}/12'),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: _drawing.layers.length >= 12
+                            ? null
+                            : () => _drawing.addLayer(),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add layer'),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _drawing.layers.length,
+                    itemBuilder: (context, index) {
+                      final layer = _drawing.layers.reversed.toList()[index];
+                      final isActive = layer.id == _drawing.activeLayerId;
+                      final originalIndex = _drawing.layers.indexWhere((item) => item.id == layer.id);
+                      return Card(
+                        margin: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              Row(
+                                children: <Widget>[
+                                  Expanded(
+                                    child: ListTile(
+                                      dense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: Icon(isActive ? Icons.layers : Icons.layers_outlined),
+                                      title: Text(layer.name,
+                                          style: TextStyle(
+                                            fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                                          )),
+                                      subtitle: Text(isActive ? 'Active layer' : 'Tap to draw on this layer'),
+                                      onTap: () => _drawing.selectLayer(layer.id),
+                                    ),
+                                  ),
+                                  Switch(
+                                    value: layer.visible,
+                                    onChanged: (value) => _drawing.setLayerVisibility(layer.id, value),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                children: <Widget>[
+                                  const Text('Opacity'),
+                                  Expanded(
+                                    child: Slider(
+                                      value: layer.opacity,
+                                      min: 0,
+                                      max: 1,
+                                      divisions: 20,
+                                      onChanged: (value) => _drawing.setLayerOpacity(layer.id, value),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 42,
+                                    child: Text('${(layer.opacity * 100).round()}%'),
+                                  ),
+                                ],
+                              ),
+                              Wrap(
+                                spacing: 6,
+                                children: <Widget>[
+                                  TextButton.icon(
+                                    onPressed: () => _renameLayer(layer),
+                                    icon: const Icon(Icons.edit_outlined, size: 17),
+                                    label: const Text('Rename'),
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: originalIndex == 0
+                                        ? null
+                                        : () => _drawing.mergeLayerDown(layer.id),
+                                    icon: const Icon(Icons.merge_type, size: 17),
+                                    label: const Text('Merge down'),
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: _drawing.layers.length <= 1
+                                        ? null
+                                        : () => _drawing.removeLayer(layer.id),
+                                    icon: const Icon(Icons.delete_outline, size: 17),
+                                    label: const Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openCreativeAgent() async {
+    if (!await _promptParentalGate() || !mounted) return;
+    var languageCode = 'en';
+    String? speechStatus;
+    final tags = <String>{
+      _drawing.selectedPage.name,
+      ..._drawing.strokes.map((stroke) => stroke.style.name),
+      ..._drawing.stamps.map((stamp) => stamp.kind.name),
+    }.take(8).toList(growable: false);
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final language = _creativeAgent.languageFor(languageCode);
+          final prompt = _creativeAgent.generateDrawingPrompt(languageCode);
+          final story = _creativeAgent.generateStory(
+            artworkTags: tags,
+            languageCode: languageCode,
+          );
+          return AlertDialog(
+            icon: const Icon(Icons.auto_awesome, size: 32),
+            title: const Text('Creative Agent · Offline'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const Text('Choose a prompt language (52 available).'),
+                  const SizedBox(height: 8),
+                  DropdownButton<String>(
+                    isExpanded: true,
+                    value: languageCode,
+                    items: AiCreativeAgent.languages.map((item) =>
+                      DropdownMenuItem<String>(
+                        value: item.code,
+                        child: Text('${item.name} · ${item.code}'),
+                      ),
+                    ).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() {
+                          languageCode = value;
+                          speechStatus = null;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Text(prompt, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  FilledButton.tonalIcon(
+                    onPressed: () async {
+                      final spoken = await _creativeAgent.speakPrompt(languageCode);
+                      if (dialogContext.mounted) {
+                        setDialogState(() => speechStatus = spoken
+                            ? 'Playing with the installed device voice.'
+                            : 'This device has no voice installed for ${language.name}.');
+                      }
+                    },
+                    icon: const Icon(Icons.volume_up),
+                    label: const Text('Speak drawing prompt'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () async {
+                      await _creativeAgent.stopSpeaking();
+                      if (dialogContext.mounted) {
+                        setDialogState(() => speechStatus = 'Voice playback stopped.');
+                      }
+                    },
+                    icon: const Icon(Icons.stop),
+                    label: const Text('Stop voice'),
+                  ),
+                  if (speechStatus != null)
+                    Text(speechStatus!, style: Theme.of(context).textTheme.bodySmall),
+                  const Divider(height: 24),
+                  const Text('Your picture story',
+                      style: TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
+                  Text(story),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Stories use local drawing tags only. No artwork or microphone audio is uploaded.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () async {
+                  final promptText = _creativeAgent.buildPrivateModelPrompt(
+                    artworkTags: tags,
+                    languageCode: languageCode,
+                  );
+                  await Clipboard.setData(ClipboardData(text: promptText));
+                  if (dialogContext.mounted) {
+                    Navigator.of(dialogContext).pop();
+                  }
+                  if (mounted) _showMessage('Private creative prompt copied.');
+                },
+                child: const Text('Copy private prompt'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Done'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _exportArtworkPng() async {
+    if (!await _promptParentalGate() || !mounted) return;
+    if (!_subscription.isAdFree) {
+      await _showPremiumOffer();
+      if (!_subscription.isAdFree || !mounted) return;
+    }
+    final png = await _captureArtworkPng();
+    if (png == null || !mounted) return;
+    try {
+      final saved = await FilePicker.saveFile(
+        dialogTitle: 'Save VibeSync artwork PNG',
+        fileName: 'vibesync-artwork-${DateTime.now().millisecondsSinceEpoch}.png',
+        bytes: png,
+      );
+      if (saved != null && mounted) {
+        _showMessage('PNG saved to the selected location. Choose Pictures to add it to your gallery.');
+      }
+    } catch (error) {
+      debugPrint('PNG export failed: $error');
+      if (mounted) _showMessage('Could not save the PNG.');
+    }
+  }
+
+  Future<void> _exportArtworkJpeg() async {
+    if (!await _promptParentalGate() || !mounted) return;
+    if (!_subscription.isAdFree) {
+      await _showPremiumOffer();
+      if (!_subscription.isAdFree || !mounted) return;
+    }
+    final png = await _captureArtworkPng();
+    if (png == null || !mounted) return;
+    try {
+      final decoded = image_codec.decodePng(png);
+      if (decoded == null) throw const FormatException('PNG encoding could not be read.');
+      final jpeg = image_codec.encodeJpg(decoded, quality: 92);
+      final saved = await FilePicker.saveFile(
+        dialogTitle: 'Save VibeSync artwork JPEG',
+        fileName: 'vibesync-artwork-${DateTime.now().millisecondsSinceEpoch}.jpg',
+        bytes: Uint8List.fromList(jpeg),
+      );
+      if (saved != null && mounted) _showMessage('JPEG saved to the selected location.');
+    } catch (error) {
+      debugPrint('JPEG export failed: $error');
+      if (mounted) _showMessage('Could not export the JPEG.');
+    }
+  }
+
+  Future<void> _exportArtworkSvg() async {
+    if (!await _promptParentalGate() || !mounted) return;
+    if (!_subscription.isAdFree) {
+      await _showPremiumOffer();
+      if (!_subscription.isAdFree || !mounted) return;
+    }
+    try {
+      final size = _drawing.canvasSize;
+      final svg = DrawingExportService.toSvg(
+        _drawing,
+        width: size.width,
+        height: size.height,
+      );
+      final saved = await FilePicker.saveFile(
+        dialogTitle: 'Save VibeSync vector SVG',
+        fileName: 'vibesync-artwork-${DateTime.now().millisecondsSinceEpoch}.svg',
+        bytes: Uint8List.fromList(utf8.encode(svg)),
+      );
+      if (saved != null && mounted) _showMessage('SVG saved to the selected location.');
+    } catch (error) {
+      debugPrint('SVG export failed: $error');
+      if (mounted) _showMessage('Could not export the SVG.');
+    }
+  }
+
+  Future<void> _exportTimelapseGif() async {
+    if (!await _promptParentalGate() || !mounted) return;
+    if (!_subscription.isAdFree) {
+      await _showPremiumOffer();
+      if (!_subscription.isAdFree || !mounted) return;
+    }
+    try {
+      final gif = DrawingExportService.encodeTimelapseGif(_drawing);
+      final saved = await FilePicker.saveFile(
+        dialogTitle: 'Save VibeSync drawing timelapse',
+        fileName: 'vibesync-timelapse-${DateTime.now().millisecondsSinceEpoch}.gif',
+        bytes: gif,
+      );
+      if (saved != null && mounted) _showMessage('Animated GIF saved to the selected location.');
+    } catch (error) {
+      debugPrint('Timelapse export failed: $error');
+      if (mounted) _showMessage(error is StateError
+          ? error.message
+          : 'Could not export the drawing timelapse.');
+    }
+  }
+
+
+  Future<void> _openCompanyWebsite() async {
+    if (!await _promptParentalGate() || !mounted) return;
+    final uri = Uri.parse('https://vibesyncro.com/');
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) _showMessage('Could not open the company website.');
+    } catch (error) {
+      debugPrint('Company website could not be opened: $error');
+      if (mounted) _showMessage('Could not open the company website.');
+    }
+  }
+
   Future<void> _launchCoffeeSupport() async {
     final uri = Uri.tryParse(_coffeeSupportUrl);
     if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
@@ -1059,7 +1537,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             SizedBox(
-              height: 54,
+              height: _drawing.studioMode == StudioMode.toddler ? 62 : 54,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1084,15 +1562,47 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                     selected: _drawing.activeTool == ActiveTool.stamp,
                     onSelected: (_) => _drawing.setActiveTool(ActiveTool.stamp),
                   ),
+                  if (_drawing.studioMode == StudioMode.proArtist) ...<Widget>[
+                    const SizedBox(width: 6),
+                    ChoiceChip(
+                      avatar: const Icon(Icons.colorize, size: 17),
+                      label: const Text('Eyedropper'),
+                      selected: _drawing.activeTool == ActiveTool.eyedropper,
+                      onSelected: (_) => _drawing.setActiveTool(ActiveTool.eyedropper),
+                    ),
+                  ],
                   const SizedBox(width: 8),
                   DropdownButton<StrokeStyle>(
                     value: _drawing.brushStyle,
                     underline: const SizedBox.shrink(),
                     hint: Text(strings.translate('brush_style')),
                     items: <DropdownMenuItem<StrokeStyle>>[
-                      DropdownMenuItem(value: StrokeStyle.solid, child: Text(strings.translate('solid'))),
-                      DropdownMenuItem(value: StrokeStyle.neon, child: Text(strings.translate('neon'))),
-                      DropdownMenuItem(value: StrokeStyle.rainbow, child: Text(strings.translate('rainbow'))),
+                      DropdownMenuItem(
+                        value: StrokeStyle.solid,
+                        child: Text(strings.translate('solid')),
+                      ),
+                      if (_drawing.studioMode == StudioMode.proArtist) ...<DropdownMenuItem<StrokeStyle>>[
+                        DropdownMenuItem(
+                          value: StrokeStyle.neon,
+                          child: Text(strings.translate('neon')),
+                        ),
+                        DropdownMenuItem(
+                          value: StrokeStyle.rainbow,
+                          child: Text(strings.translate('rainbow')),
+                        ),
+                        const DropdownMenuItem(
+                          value: StrokeStyle.watercolor,
+                          child: Text('Watercolor'),
+                        ),
+                        const DropdownMenuItem(
+                          value: StrokeStyle.calligraphy,
+                          child: Text('Calligraphy'),
+                        ),
+                        const DropdownMenuItem(
+                          value: StrokeStyle.charcoal,
+                          child: Text('Charcoal'),
+                        ),
+                      ],
                     ],
                     onChanged: (value) {
                       if (value == null) return;
@@ -1121,7 +1631,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
               ),
             ),
             SizedBox(
-              height: 50,
+              height: _drawing.studioMode == StudioMode.toddler ? 56 : 50,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1162,11 +1672,15 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                                   _drawing.setStampColors(fill: color);
                                 }
                                 break;
+                              case ActiveTool.eyedropper:
+                                _drawing.setBrushColor(color);
+                                _drawing.setActiveTool(ActiveTool.brush);
+                                break;
                             }
                           },
                           child: Container(
-                            width: 31,
-                            height: 31,
+                            width: _drawing.studioMode == StudioMode.toddler ? 38 : 31,
+                            height: _drawing.studioMode == StudioMode.toddler ? 38 : 31,
                             margin: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
                               color: color,
@@ -1208,6 +1722,29 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
                         onSelected: (value) => setState(() => _selectingStampOutline = value),
                       ),
                     ),
+                  if (_drawing.studioMode == StudioMode.proArtist) ...<Widget>[
+                    const SizedBox(width: 8),
+                    DropdownButton<SymmetryMode>(
+                      value: _drawing.symmetryMode,
+                      underline: const SizedBox.shrink(),
+                      hint: const Text('Symmetry'),
+                      items: const <DropdownMenuItem<SymmetryMode>>[
+                        DropdownMenuItem(value: SymmetryMode.none, child: Text('No symmetry')),
+                        DropdownMenuItem(value: SymmetryMode.mirrorHorizontal, child: Text('Mirror left/right')),
+                        DropdownMenuItem(value: SymmetryMode.mirrorVertical, child: Text('Mirror top/bottom')),
+                        DropdownMenuItem(value: SymmetryMode.radial4, child: Text('Radial 4')),
+                        DropdownMenuItem(value: SymmetryMode.radial8, child: Text('Radial 8')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) _drawing.setSymmetryMode(value);
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'Manage layers',
+                      onPressed: _showLayerManager,
+                      icon: const Icon(Icons.layers_outlined),
+                    ),
+                  ],
                   const SizedBox(width: 6),
                   IconButton(
                     tooltip: strings.translate('bg_change'),
@@ -1358,104 +1895,187 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          strings.translate('app_title'),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(_chromeVisible ? kToolbarHeight : 0),
+        child: AnimatedSize(
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeInOutCubic,
+          alignment: Alignment.topCenter,
+          child: _chromeVisible
+              ? AppBar(
+                  title: Text(
+                    strings.translate('app_title'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                  actions: <Widget>[
+                    IconButton(
+                      tooltip: strings.translate('check_updates'),
+                      onPressed: () {
+                        if (_isOnline == true) {
+                          unawaited(_checkForUpdate());
+                        } else {
+                          _showMessage(strings.translate('offline_message'));
+                        }
+                      },
+                      icon: const Icon(Icons.system_update_alt),
+                    ),
+                    IconButton(
+                      tooltip: strings.translate('parent_corner'),
+                      onPressed: _openParentsCorner,
+                      icon: const Icon(Icons.family_restroom),
+                    ),
+                  ],
+                )
+              : const SizedBox.shrink(),
         ),
-        actions: <Widget>[
-          IconButton(
-            tooltip: strings.translate('check_updates'),
-            onPressed: () {
-              if (_isOnline == true) {
-                unawaited(_checkForUpdate());
-              } else {
-                _showMessage(strings.translate('offline_message'));
-              }
-            },
-            icon: const Icon(Icons.system_update_alt),
-          ),
-          IconButton(
-            tooltip: strings.translate('parent_corner'),
-            onPressed: _openParentsCorner,
-            icon: const Icon(Icons.family_restroom),
-          ),
-        ],
       ),
       body: SafeArea(
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
             Column(
-          children: <Widget>[
-            if (_isOnline == false) _buildOfflineBanner(strings),
-            if (_isOnline == true && _updateAvailable) _buildUpdateBanner(strings),
-            _buildToolbar(strings),
-            _buildPagePicker(strings),
-            Expanded(
-              child: Container(
-                key: _canvasKey,
-                margin: const EdgeInsets.fromLTRB(8, 4, 8, 6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFFFE082), width: 2),
-                  boxShadow: const <BoxShadow>[
-                    BoxShadow(
-                      color: Color(0x14000000),
-                      blurRadius: 6,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
+              children: <Widget>[
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 260),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, -0.12),
+                      end: Offset.zero,
+                    ).animate(CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    )),
+                    child: FadeTransition(opacity: animation, child: child),
+                  ),
+                  child: _chromeVisible
+                      ? Column(
+                          key: const ValueKey<String>('drawing-top-controls'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            if (_isOnline == false) _buildOfflineBanner(strings),
+                            if (_isOnline == true && _updateAvailable)
+                              _buildUpdateBanner(strings),
+                            _buildToolbar(strings),
+                            _buildPagePicker(strings),
+                          ],
+                        )
+                      : const SizedBox.shrink(
+                          key: ValueKey<String>('drawing-top-hidden'),
+                        ),
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: DrawingCanvas(
-                  controller: _drawing,
-                  onFeedback: _showMessage,
+                Expanded(
+                  child: Container(
+                    key: _canvasKey,
+                    margin: const EdgeInsets.fromLTRB(8, 4, 8, 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFFFE082),
+                        width: 2,
+                      ),
+                      boxShadow: const <BoxShadow>[
+                        BoxShadow(
+                          color: Color(0x14000000),
+                          blurRadius: 6,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: DrawingCanvas(
+                      controller: _drawing,
+                      onFeedback: _showMessage,
+                      onDoubleTapCanvas: _toggleChrome,
+                      onColorPicked: (color) {
+                        _drawing.setBrushColor(color);
+                        _drawing.setActiveTool(ActiveTool.brush);
+                      },
+                    ),
+                  ),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 260),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.12),
+                      end: Offset.zero,
+                    ).animate(CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    )),
+                    child: FadeTransition(opacity: animation, child: child),
+                  ),
+                  child: _chromeVisible
+                      ? Column(
+                          key: const ValueKey<String>('drawing-bottom-controls'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            AnimatedBuilder(
+                              animation: _drawing,
+                              builder: (context, _) => Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 2,
+                                ),
+                                child: Row(
+                                  children: <Widget>[
+                                    IconButton(
+                                      tooltip: strings.translate('undo'),
+                                      onPressed: _drawing.canUndo ? _drawing.undo : null,
+                                      icon: const Icon(Icons.undo),
+                                    ),
+                                    IconButton(
+                                      tooltip: strings.translate('redo'),
+                                      onPressed: _drawing.canRedo ? _drawing.redo : null,
+                                      icon: const Icon(Icons.redo),
+                                    ),
+                                    IconButton(
+                                      tooltip: strings.translate('save_share'),
+                                      onPressed: _saveArtwork,
+                                      icon: const Icon(Icons.ios_share),
+                                    ),
+                                    const Spacer(),
+                                    FilledButton.tonalIcon(
+                                      onPressed: _confirmClear,
+                                      icon: const Icon(Icons.delete_outline, size: 18),
+                                      label: Text(strings.translate('clear')),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            if (_subscriptionReady && !_subscription.isAdFree)
+                              _buildAdDock(strings),
+                          ],
+                        )
+                      : const SizedBox.shrink(
+                          key: ValueKey<String>('drawing-bottom-hidden'),
+                        ),
+                ),
+              ],
+            ),
+            if (!_chromeVisible)
+              Positioned(
+                right: 16,
+                bottom: 16,
+                child: FloatingActionButton.small(
+                  tooltip: 'Show drawing controls',
+                  onPressed: _toggleChrome,
+                  child: const Icon(Icons.tune),
                 ),
               ),
-            ),
-            AnimatedBuilder(
-              animation: _drawing,
-              builder: (context, _) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                child: Row(
-                  children: <Widget>[
-                    IconButton(
-                      tooltip: strings.translate('undo'),
-                      onPressed: _drawing.canUndo ? _drawing.undo : null,
-                      icon: const Icon(Icons.undo),
-                    ),
-                    IconButton(
-                      tooltip: strings.translate('redo'),
-                      onPressed: _drawing.canRedo ? _drawing.redo : null,
-                      icon: const Icon(Icons.redo),
-                    ),
-                    IconButton(
-                      tooltip: strings.translate('save_share'),
-                      onPressed: _saveArtwork,
-                      icon: const Icon(Icons.ios_share),
-                    ),
-                    const Spacer(),
-                    FilledButton.tonalIcon(
-                      onPressed: _confirmClear,
-                      icon: const Icon(Icons.delete_outline, size: 18),
-                      label: Text(strings.translate('clear')),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (_subscriptionReady && !_subscription.isAdFree) _buildAdDock(strings),
-            ],
-            ),
             if (_restoringDrawing)
               Positioned.fill(
                 child: AbsorbPointer(
                   child: ColoredBox(
-                    color: Color(0xCCFFFFFB),
+                    color: const Color(0xCCFFFFFB),
                     child: Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -1478,6 +2098,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     _autosaveTimer?.cancel();
     _drawing.removeListener(_onDrawingChanged);
     if (!_restoringDrawing) {
@@ -1498,6 +2119,7 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
     _updateSubscription?.cancel();
     _subscription.removeListener(_onSubscriptionChanged);
     _subscription.dispose();
+    unawaited(_creativeAgent.dispose());
     _bannerAd?.dispose();
     super.dispose();
   }

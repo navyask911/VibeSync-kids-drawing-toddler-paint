@@ -12,8 +12,8 @@ if (localPropertiesFile.exists()) {
     }
 }
 
-def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "20261025"
-def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.6"
+def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "20261026"
+def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.7"
 
 // -----------------------------------------------------------------------------
 // SECURE KEYSTORE SIGNATURE LOADING
@@ -48,11 +48,11 @@ android {
 
     defaultConfig {
         applicationId "com.navya.kids_drawing_studio"
-        // Google Mobile Ads SDK v24 requires Android API 23 or higher.
+        // Google Play Billing and the supported in_app_purchase stack require API 24+.
         minSdkVersion 24
         targetSdkVersion 36
-        versionCode 20261025
-        versionName "1.0.6"
+        versionCode 20261026
+        versionName "1.0.7"
         multiDexEnabled true
     }
 

@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 import 'package:path_provider/path_provider.dart';
 
 class AdFreeSubscriptionService extends ChangeNotifier {
@@ -135,12 +136,20 @@ class AdFreeSubscriptionService extends ChangeNotifier {
           .timeout(const Duration(seconds: 8));
       if (response.error != null) message = response.error!.message;
       product = null;
+      ProductDetails? firstMatch;
       for (final details in response.productDetails) {
-        if (details.id == productId) {
+        if (details.id != productId) continue;
+        firstMatch ??= details;
+        // Google Play returns a detail for each eligible subscription offer.
+        // Prefer a result with a usable base-plan offer token.
+        if (details is GooglePlayProductDetails &&
+            details.offerToken != null &&
+            details.offerToken!.isNotEmpty) {
           product = details;
           break;
         }
       }
+      product ??= firstMatch;
       if (product == null && response.notFoundIDs.contains(productId)) {
         message = 'The ad-free subscription is not configured in Google Play yet.';
       }
@@ -164,8 +173,25 @@ class AdFreeSubscriptionService extends ChangeNotifier {
     message = null;
     notifyListeners();
     try {
+      final PurchaseParam purchaseParam;
+      if (Platform.isAndroid) {
+        if (details is! GooglePlayProductDetails ||
+            details.offerToken == null ||
+            details.offerToken!.isEmpty) {
+          isPurchasing = false;
+          message = 'Google Play did not return an eligible subscription offer. Check the active base plan in Play Console.';
+          notifyListeners();
+          return;
+        }
+        purchaseParam = GooglePlayPurchaseParam(
+          productDetails: details,
+          offerToken: details.offerToken,
+        );
+      } else {
+        purchaseParam = PurchaseParam(productDetails: details);
+      }
       final started = await _store.buyNonConsumable(
-        purchaseParam: PurchaseParam(productDetails: details),
+        purchaseParam: purchaseParam,
       );
       if (!started) {
         isPurchasing = false;

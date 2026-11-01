@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -34,6 +35,39 @@ class _AddStampCommand extends _DrawingCommand {
 
   @override
   void undo(DrawingController controller) => controller._stamps.remove(stamp);
+}
+
+class _CompositeCommand extends _DrawingCommand {
+  _CompositeCommand(this.commands);
+
+  final List<_DrawingCommand> commands;
+
+  @override
+  void redo(DrawingController controller) {
+    for (final command in commands) {
+      command.redo(controller);
+    }
+  }
+
+  @override
+  void undo(DrawingController controller) {
+    for (final command in commands.reversed) {
+      command.undo(controller);
+    }
+  }
+
+  @override
+  bool get affectsBackground => commands.any((command) => command.affectsBackground);
+
+  @override
+  bool get affectsScene => commands.any((command) => command.affectsScene);
+
+  @override
+  Iterable<ui.Image> get referencedImages sync* {
+    for (final command in commands) {
+      yield* command.referencedImages;
+    }
+  }
 }
 
 class _BackgroundCommand extends _DrawingCommand {
@@ -141,12 +175,21 @@ class DrawingController extends ChangeNotifier {
   final List<_DrawingCommand> _undoStack = <_DrawingCommand>[];
   final List<_DrawingCommand> _redoStack = <_DrawingCommand>[];
   final Set<ui.Image> _ownedImages = <ui.Image>{};
+  final List<DrawingLayer> _layers = <DrawingLayer>[
+    const DrawingLayer(id: 1, name: 'Layer 1'),
+  ];
+  int _nextLayerId = 2;
+  int activeLayerId = 1;
+  Size canvasSize = Size.zero;
+  SymmetryMode symmetryMode = SymmetryMode.none;
+  StudioMode studioMode = StudioMode.toddler;
 
   final ChangeNotifier backgroundRepaint = ChangeNotifier();
   final ChangeNotifier sceneRepaint = ChangeNotifier();
   final ChangeNotifier activeRepaint = ChangeNotifier();
 
   List<Offset>? _activePoints;
+  List<double>? _activePressureSamples;
   Color _activeStrokeColor = const Color(0xFFE64A19);
   double _activeStrokeWidth = 6;
   StrokeStyle _activeStrokeStyle = StrokeStyle.solid;
@@ -168,6 +211,9 @@ class DrawingController extends ChangeNotifier {
   List<CanvasStamp> get stamps =>
       UnmodifiableListView<CanvasStamp>(_stamps);
   List<CanvasFill> get fills => UnmodifiableListView<CanvasFill>(_fills);
+  List<DrawingLayer> get layers => UnmodifiableListView<DrawingLayer>(_layers);
+  DrawingLayer get activeLayer =>
+      _layers.firstWhere((layer) => layer.id == activeLayerId);
   List<Offset> get activePoints =>
       UnmodifiableListView<Offset>(_activePoints ?? const <Offset>[]);
   bool get canUndo => _undoStack.isNotEmpty;
@@ -220,35 +266,251 @@ class DrawingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void beginStroke(Offset point) {
+
+  void setCanvasSize(Size value) {
+    if (canvasSize == value) return;
+    canvasSize = value;
+  }
+
+  void setStudioMode(StudioMode value) {
+    if (studioMode == value) return;
+    studioMode = value;
+    notifyListeners();
+  }
+
+  void setSymmetryMode(SymmetryMode value) {
+    if (symmetryMode == value) return;
+    symmetryMode = value;
+    notifyListeners();
+  }
+
+  int? addLayer({String? name}) {
+    if (_layers.length >= 12) return null;
+    final id = _nextLayerId++;
+    _layers.add(DrawingLayer(
+      id: id,
+      name: name ?? 'Layer ${_layers.length + 1}',
+    ));
+    activeLayerId = id;
+    _clearHistory();
+    _notifyLayerChange();
+    return id;
+  }
+
+  bool selectLayer(int id) {
+    if (!_layers.any((layer) => layer.id == id)) return false;
+    if (activeLayerId == id) return true;
+    activeLayerId = id;
+    notifyListeners();
+    return true;
+  }
+
+  bool setLayerVisibility(int id, bool visible) {
+    final index = _layers.indexWhere((layer) => layer.id == id);
+    if (index < 0) return false;
+    _layers[index] = _layers[index].copyWith(visible: visible);
+    _notifyLayerChange();
+    return true;
+  }
+
+  bool setLayerOpacity(int id, double opacity) {
+    final index = _layers.indexWhere((layer) => layer.id == id);
+    if (index < 0 || !opacity.isFinite) return false;
+    _layers[index] = _layers[index].copyWith(opacity: opacity);
+    _notifyLayerChange();
+    return true;
+  }
+
+  bool renameLayer(int id, String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || trimmed.length > 32) return false;
+    final index = _layers.indexWhere((layer) => layer.id == id);
+    if (index < 0) return false;
+    _layers[index] = _layers[index].copyWith(name: trimmed);
+    notifyListeners();
+    return true;
+  }
+
+  bool removeLayer(int id) {
+    if (_layers.length <= 1) return false;
+    final index = _layers.indexWhere((layer) => layer.id == id);
+    if (index < 0) return false;
+    _layers.removeAt(index);
+    _strokes.removeWhere((stroke) => stroke.layerId == id);
+    _stamps.removeWhere((stamp) => stamp.layerId == id);
+    _fills.removeWhere((fill) => fill.layerId == id);
+    if (activeLayerId == id) activeLayerId = _layers.last.id;
+    _clearHistory();
+    _notifyLayerChange();
+    return true;
+  }
+
+  bool mergeLayerDown(int id) {
+    final index = _layers.indexWhere((layer) => layer.id == id);
+    if (index <= 0) return false;
+    final source = _layers[index];
+    final target = _layers[index - 1];
+    for (var i = 0; i < _strokes.length; i++) {
+      final stroke = _strokes[i];
+      if (stroke.layerId == source.id) {
+        _strokes[i] = AdvancedStroke(
+          points: stroke.points,
+          style: stroke.style,
+          color: stroke.color,
+          width: stroke.width,
+          order: stroke.order,
+          layerId: target.id,
+          pressureSamples: stroke.pressureSamples,
+          createdAt: stroke.createdAt,
+        );
+      }
+    }
+    for (var i = 0; i < _stamps.length; i++) {
+      final stamp = _stamps[i];
+      if (stamp.layerId == source.id) {
+        _stamps[i] = CanvasStamp(
+          kind: stamp.kind,
+          position: stamp.position,
+          scale: stamp.scale,
+          rotationAngle: stamp.rotationAngle,
+          fillColor: stamp.fillColor,
+          strokeColor: stamp.strokeColor,
+          layerCategory: stamp.layerCategory,
+          order: stamp.order,
+          layerId: target.id,
+        );
+      }
+    }
+    for (var i = 0; i < _fills.length; i++) {
+      final fill = _fills[i];
+      if (fill.layerId == source.id) {
+        _fills[i] = CanvasFill(
+          image: fill.image,
+          logicalSize: fill.logicalSize,
+          layerId: target.id,
+        );
+      }
+    }
+    _layers.removeAt(index);
+    if (activeLayerId == id) activeLayerId = target.id;
+    _clearHistory();
+    _notifyLayerChange();
+    return true;
+  }
+
+  void _clearHistory() {
+    _undoStack.clear();
+    _redoStack.clear();
+    _pruneOwnedImages();
+  }
+
+  void _notifyLayerChange() {
+    notifyListeners();
+    backgroundRepaint.notifyListeners();
+    sceneRepaint.notifyListeners();
+    activeRepaint.notifyListeners();
+  }
+
+  List<List<Offset>> _symmetryPaths(List<Offset> points) {
+    final mode = symmetryMode;
+    if (mode == SymmetryMode.none || canvasSize.isEmpty) return <List<Offset>>[points];
+    final center = canvasSize.center(Offset.zero);
+    Offset mirror(Offset point, {bool horizontal = false, bool vertical = false}) {
+      return Offset(
+        horizontal ? 2 * center.dx - point.dx : point.dx,
+        vertical ? 2 * center.dy - point.dy : point.dy,
+      );
+    }
+    if (mode == SymmetryMode.mirrorHorizontal) {
+      return <List<Offset>>[
+        points,
+        points.map((point) => mirror(point, horizontal: true)).toList(growable: false),
+      ];
+    }
+    if (mode == SymmetryMode.mirrorVertical) {
+      return <List<Offset>>[
+        points,
+        points.map((point) => mirror(point, vertical: true)).toList(growable: false),
+      ];
+    }
+    final count = mode == SymmetryMode.radial4 ? 4 : 8;
+    return List<List<Offset>>.generate(count, (index) {
+      final angle = index * 2 * 3.141592653589793 / count;
+      final cosA = math.cos(angle);
+      final sinA = math.sin(angle);
+      return points.map((point) {
+        final dx = point.dx - center.dx;
+        final dy = point.dy - center.dy;
+        return Offset(
+          center.dx + dx * cosA - dy * sinA,
+          center.dy + dx * sinA + dy * cosA,
+        );
+      }).toList(growable: false);
+    }, growable: false);
+  }
+
+  void _commitStroke(List<Offset> points, {
+    required StrokeStyle style,
+    required Color color,
+    required double width,
+    List<double>? pressureSamples,
+  }) {
+    final paths = _symmetryPaths(points);
+    final commands = <_DrawingCommand>[];
+    for (final path in paths) {
+      commands.add(_AddStrokeCommand(AdvancedStroke(
+        points: path,
+        style: style,
+        color: color,
+        width: width,
+        order: _nextOrder++,
+        layerId: activeLayerId,
+        pressureSamples: pressureSamples,
+      )));
+    }
+    if (commands.length == 1) {
+      _execute(commands.single);
+    } else if (commands.isNotEmpty) {
+      _execute(_CompositeCommand(commands));
+    }
+  }
+
+  void beginStroke(Offset point, {double pressure = 1}) {
     if (activeTool != ActiveTool.brush) return;
     _activePoints = <Offset>[point];
+    _activePressureSamples = <double>[_normalisePressure(pressure)];
     _activeStrokeColor = brushColor;
     _activeStrokeWidth = brushWidth;
     _activeStrokeStyle = brushStyle;
     activeRepaint.notifyListeners();
   }
 
-  void appendActivePoint(Offset point) {
+  double _normalisePressure(double pressure) =>
+      pressure.isFinite ? pressure.clamp(0.1, 1.0).toDouble() : 1.0;
+
+  void appendActivePoint(Offset point, {double pressure = 1}) {
     final active = _activePoints;
     if (active == null || active.isEmpty) return;
     if ((active.last - point).distance < 0.55) return;
     active.add(point);
+    _activePressureSamples?.add(_normalisePressure(pressure));
     activeRepaint.notifyListeners();
   }
 
   void finishStroke() {
     final active = _activePoints;
+    final pressureSamples = _activePressureSamples;
     if (active == null) return;
     _activePoints = null;
+    _activePressureSamples = null;
     if (active.isNotEmpty) {
-      _execute(_AddStrokeCommand(AdvancedStroke(
-        points: active,
+      _commitStroke(
+        active,
         style: _activeStrokeStyle,
         color: _activeStrokeColor,
         width: _activeStrokeWidth,
-        order: _nextOrder++,
-      )));
+        pressureSamples: pressureSamples,
+      );
     } else {
       activeRepaint.notifyListeners();
     }
@@ -256,15 +518,17 @@ class DrawingController extends ChangeNotifier {
 
   void cancelActiveStroke({bool keepPartialDrawing = true}) {
     final active = _activePoints;
+    final pressureSamples = _activePressureSamples;
     _activePoints = null;
+    _activePressureSamples = null;
     if (keepPartialDrawing && active != null && active.isNotEmpty) {
-      _execute(_AddStrokeCommand(AdvancedStroke(
-        points: active,
-        style: brushStyle,
-        color: brushColor,
-        width: brushWidth,
-        order: _nextOrder++,
-      )));
+      _commitStroke(
+        active,
+        style: _activeStrokeStyle,
+        color: _activeStrokeColor,
+        width: _activeStrokeWidth,
+        pressureSamples: pressureSamples,
+      );
     } else {
       activeRepaint.notifyListeners();
     }
@@ -286,6 +550,7 @@ class DrawingController extends ChangeNotifier {
       strokeColor: stampStrokeColor,
       layerCategory: category,
       order: _nextOrder++,
+      layerId: activeLayerId,
     )));
   }
 
@@ -305,7 +570,11 @@ class DrawingController extends ChangeNotifier {
         logicalSize.height <= 0) {
       return false;
     }
-    final fill = CanvasFill(image: image, logicalSize: logicalSize);
+    final fill = CanvasFill(
+      image: image,
+      logicalSize: logicalSize,
+      layerId: activeLayerId,
+    );
     _ownedImages.add(image);
     _execute(_AddFillCommand(fill));
     return true;
@@ -389,6 +658,10 @@ class DrawingController extends ChangeNotifier {
     required ActiveTool restoredActiveTool,
     required StampKind restoredSelectedStamp,
     required ColoringPage restoredSelectedPage,
+    List<DrawingLayer>? restoredLayers,
+    int? restoredActiveLayerId,
+    SymmetryMode restoredSymmetryMode = SymmetryMode.none,
+    StudioMode restoredStudioMode = StudioMode.toddler,
   }) {
     for (final image in _ownedImages) {
       image.dispose();
@@ -415,7 +688,20 @@ class DrawingController extends ChangeNotifier {
     activeTool = restoredActiveTool;
     selectedStamp = restoredSelectedStamp;
     selectedPage = restoredSelectedPage;
+    _layers
+      ..clear()
+      ..addAll(restoredLayers == null || restoredLayers.isEmpty
+          ? const <DrawingLayer>[DrawingLayer(id: 1, name: 'Layer 1')]
+          : restoredLayers);
+    activeLayerId = _layers.any((layer) => layer.id == restoredActiveLayerId)
+        ? restoredActiveLayerId!
+        : _layers.first.id;
+    _nextLayerId = _layers.fold<int>(1, (maximum, layer) =>
+        layer.id >= maximum ? layer.id + 1 : maximum);
+    symmetryMode = restoredSymmetryMode;
+    studioMode = restoredStudioMode;
     _activePoints = null;
+    _activePressureSamples = null;
     _undoStack.clear();
     _redoStack.clear();
 

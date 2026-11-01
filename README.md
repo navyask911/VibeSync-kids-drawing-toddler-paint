@@ -1,43 +1,66 @@
-# VibeSync Kids Drawing Toddler Paint
+# VibeSync Kids Drawing & Creative Studio Pro
 
-A child-friendly Flutter drawing application with freehand drawing, brush styles, stickers, coloring templates, undo/redo and a bounded paint-bucket tool.
+A Flutter drawing studio for children and families, published by **VibeSyncro Technologies Pvt Ltd**.
 
-## App source
+Website: https://vibesyncro.com/
 
-- `lib/main.dart`: app shell, AdMob lifecycle, in-app update prompt, parent-gated support and language selection.
-- `lib/drawing/drawing_controller.dart`: drawing state, immutable stroke history, stamps, canvas fills and bounded undo/redo.
-- `lib/drawing/drawing_models.dart`: typed strokes, stamps, layers and coloring-page types.
-- `lib/drawing/drawing_painters.dart`: background/template/stamp/stroke painter layers with neon and rainbow styles.
-- `lib/drawing/drawing_canvas.dart`: pointer handling, asynchronous raster fill and parent-gated PNG sharing.
-- `lib/drawing/drawing_persistence.dart`: bounded local autosave/restore of strokes, stamps, palette and raster fill layers.
-- `lib/drawing/flood_fill.dart`: bounded non-recursive RGBA flood-fill algorithm that runs through Flutter's compute isolate.
-- `lib/l10n/app_localizations.dart`: initial English, Spanish, Hindi, Chinese, German and French strings.
-- `lib/ad_helper.dart`: existing AdMob request configuration and ad lifecycle helper.
-- `src/`: separate React/Vite developer dashboard and generated-code demonstration.
+## Features
 
-## Offline behavior and optional support
+- Child-friendly free drawing, fill bucket, stickers, coloring templates, undo/redo and local autosave.
+- Toddler Mode with larger touch targets and multi-pointer stroke rejection.
+- Parent-gated Pro Artist Mode with up to 12 editable layers, opacity, visibility, layer merge/delete, radial 4/8-way symmetry, mirror symmetry, eyedropper and advanced brushes.
+- Neon glow, rainbow gradient, watercolor, pressure-simulated calligraphy and charcoal renderers.
+- Double-tap canvas chrome hide/show with animated toolbars and haptic feedback.
+- Optional yearly Google Play subscription using product ID `adfree_yearly`. The in-app UI displays the localized price returned by Google Play.
+- Parent-controlled PNG/JPEG/PDF/SVG export, JSON backup/restore and animated GIF stroke-sequence export.
+- An offline Creative Agent with 52 prompt/story language entries and device text-to-speech. It does not capture microphone audio or call a hosted LLM.
 
-The drawing screen opens before ad/network initialization completes. Drawing operations remain local to the device and usable when the internet is unavailable. Internet status is checked so the app can show a non-blocking offline banner and retry update checks when the connection returns.
+## Repository layout
 
-The Android in-app update prompt uses Google Play's in-app update API and therefore requires an eligible Google Play install and a published update. Local APKs and ordinary emulator runs cannot fully verify that native update flow.
+- `lib/main.dart`: app shell, parent gate, subscription UI, studio controls, full-screen chrome, creative agent and export actions.
+- `lib/subscriptions/ad_free_subscription_service.dart`: Google Play purchase stream, restore flow and app-private offline entitlement cache.
+- `lib/drawing/drawing_controller.dart`: stroke history, layers, layer commands and symmetry transforms.
+- `lib/drawing/drawing_models.dart`: drawing models, timestamps, pressure samples, layers, tools, modes and brush types.
+- `lib/drawing/drawing_painters.dart`: layer painter and brush renderers.
+- `lib/drawing/drawing_canvas.dart`: pointer handling, palm-touch rejection, fill bucket and canvas pixel eyedropper.
+- `lib/drawing/drawing_persistence.dart`: versioned, bounded local autosave and parent-selected JSON backup/restore.
+- `lib/creative/ai_creative_agent.dart`: offline prompt/story dictionary and device TTS for 52 languages.
+- `lib/export/drawing_export_service.dart`: SVG stroke-path and animated GIF stroke-sequence encoders.
+- `lib/l10n/app_localizations.dart`: app chrome localization (currently English, Spanish, Hindi, Chinese, German and French).
 
-Parents can export artwork as a PNG through the system share sheet after passing the parent gate. The app creates a temporary local image; it does not upload artwork to a developer-operated server.
+## Subscription setup
 
-An optional coffee/support action is available only after the arithmetic parent gate. Configure a valid HTTPS support page at build time:
+The Android app queries the Google Play subscription product ID:
 
-```sh
-flutter build appbundle --release --dart-define=COFFEE_SUPPORT_URL=https://your-real-support-page.example
+```text
+adfree_yearly
 ```
 
-Replace the example with the actual creator-owned support URL before release. Without a configured URL, the app explains that the link has not been set and keeps all drawing features available. No support prompt is shown directly to children.
+Create and activate this subscription in Play Console, add an annual auto-renewing base plan, and set the India price to **₹299 per year** (or the intended localized price in other markets). Google Play owns the displayed price, offer eligibility, billing periods and renewal terms; the app intentionally displays the price returned by the store rather than hard-coding it.
 
-## Advertising and child safety
+The current app entitlement is based on the Google Play purchase stream/restore response with a 24-hour app-private cache for offline startup. **There is no server-side purchase-token verification service in this repository.** The local cache is convenience state, not tamper-resistant proof: before relying on subscriptions for cross-device access, refunds, chargebacks, revocations or high-value entitlements, add a secure backend that verifies Play purchase tokens and checks subscription expiry and acknowledgement. Never treat a client-only cache as the billing authority.
 
-The app applies child-directed AdMob request settings and keeps the banner isolated from the drawing canvas. Rewarded/interstitial test IDs are used only in debug builds. Release builds do not load those formats unless production IDs are configured with `--dart-define=ADMOB_REWARDED_ANDROID=...` and/or `--dart-define=ADMOB_INTERSTITIAL_ANDROID=...` (use corresponding `_IOS` values for iOS). Without a production rewarded ID, locked coloring pages can be unlocked after parent approval without an ad. A configuration flag is not a certification: verify the current Google Play Families policies, ad SDK eligibility, app content, privacy notice and Play Console declarations before release.
+## Data handling and child safety
+
+- Drawing state and backups remain on-device unless a parent explicitly chooses a destination through the system file/share UI.
+- The Creative Agent uses local text dictionaries and the installed device text-to-speech engine. It does not record speech or send prompts/artwork to an LLM.
+- The app does not request microphone or precise-location permissions.
+- Parent gates are friction controls, not age verification or a substitute for verifiable parental consent.
+- AdMob child-directed/non-personalized request flags are technical settings, not a Families Policy or COPPA/GDPR certification. Confirm current certified ad SDK requirements, disclosures, consent obligations, Data safety answers and Play Console declarations before publishing.
+
+See [PRIVACY.md](PRIVACY.md) and [privacy-policy.html](privacy-policy.html). Review them whenever dependencies or SDK settings change.
+
+## Export scope
+
+- PNG is rendered from the canvas scene and can be shared through Android's share sheet.
+- JPEG is encoded from the rendered PNG.
+- SVG exports editable vector polylines for committed stroke paths and visible layer opacity. It does not vectorize raster fill images or reproduce every stamp/template primitive.
+- PDF export wraps the rendered PNG on an A4 page for sharing, printing or saving.
+- GIF timelapse reconstructs a bounded stroke sequence from saved stroke order/timestamps. It is not an MP4 recorder and does not replay canvas fills or every stamp/template animation.
 
 ## Build and verification
 
-Use Flutter stable and Java 17.
+Use Flutter stable **3.44.0 or newer**, Dart **3.12 or newer** from the same Flutter SDK, Java 17 and Android SDK build-tools.
 
 ```sh
 flutter pub get
@@ -45,13 +68,23 @@ dart run flutter_launcher_icons
 flutter test
 flutter analyze
 flutter build appbundle --release
+flutter build apk --release
 ```
 
-GitHub Actions runs launcher generation, Flutter tests, static analysis and release AAB/APK builds. Test the drawing canvas on physical Android devices and test native Play update flows through a Play testing track before production release.
+GitHub Actions performs dependency resolution, launcher generation, Flutter tests, Dart analysis, signed AAB/APK builds, 16 KB App Bundle/ELF/ZIP alignment checks and artifact upload.
 
+## Release version
 
-## Android release versioning
+Current candidate: **1.0.7 (versionCode 20261026)**, represented by:
 
-The current candidate is version name `1.0.5` with build/version code `20261024` (`version: 1.0.5+20261024` in `pubspec.yaml`). CI checks that the numeric code increases from the base revision and matches the Android Gradle version settings. Play Console's previously used version codes are external to this repository, so verify the code is still unused before publishing.
+```yaml
+version: 1.0.7+20261026
+```
 
-The release workflow also checks App Bundle alignment configuration, APK ZIP alignment and ELF LOAD-segment alignment for 16 KB pages. A passing CI build is a technical check, not a Google Play policy/compliance certification.
+The same values must be reflected in `android/app/build.gradle`. Verify the version code has not already been used in Play Console before uploading.
+
+## Company
+
+© 2026 VibeSyncro Technologies Pvt Ltd. All rights reserved.
+
+https://vibesyncro.com/

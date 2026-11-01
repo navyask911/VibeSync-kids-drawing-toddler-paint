@@ -52,6 +52,7 @@ class ActiveStrokePainter extends CustomPainter {
         color: controller.activeStrokeColor,
         width: controller.activeStrokeWidth,
         style: controller.activeStrokeStyle,
+        layerId: controller.activeLayerId,
       ),
     );
   }
@@ -80,16 +81,6 @@ void paintBackgroundLayer(
   canvas.drawColor(controller.backgroundColor, BlendMode.src);
   _drawColoringTemplate(canvas, size, controller.selectedPage);
 
-  for (final fill in controller.fills) {
-    final image = fill.image;
-    final source = Rect.fromLTWH(
-      0,
-      0,
-      image.width.toDouble(),
-      image.height.toDouble(),
-    );
-    canvas.drawImageRect(image, source, Offset.zero & size, Paint());
-  }
 }
 
 void paintSceneLayer(
@@ -97,22 +88,39 @@ void paintSceneLayer(
   Size size,
   DrawingController controller,
 ) {
-  final stamps = controller.stamps.toList()
-    ..sort((a, b) {
-      final layerOrder = a.layerCategory.index.compareTo(b.layerCategory.index);
-      return layerOrder != 0 ? layerOrder : a.order.compareTo(b.order);
-    });
-  for (final stamp in stamps) {
-    _drawStamp(canvas, stamp);
-  }
+  for (final layer in controller.layers) {
+    if (!layer.visible || layer.opacity <= 0) continue;
+    canvas.saveLayer(
+      Offset.zero & size,
+      Paint()..color = Color.fromARGB((layer.opacity * 255).round(), 255, 255, 255),
+    );
+    for (final fill in controller.fills.where((fill) => fill.layerId == layer.id)) {
+      final image = fill.image;
+      final source = Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble());
+      canvas.drawImageRect(image, source, Offset.zero & size, Paint());
+    }
+    final stamps = controller.stamps
+        .where((stamp) => stamp.layerId == layer.id)
+        .toList()
+      ..sort((a, b) {
+        final layerOrder = a.layerCategory.index.compareTo(b.layerCategory.index);
+        return layerOrder != 0 ? layerOrder : a.order.compareTo(b.order);
+      });
+    for (final stamp in stamps) {
+      _drawStamp(canvas, stamp);
+    }
 
-  final strokes = controller.strokes.toList()
-    ..sort((a, b) {
-      final layerOrder = a.layerCategory.index.compareTo(b.layerCategory.index);
-      return layerOrder != 0 ? layerOrder : a.order.compareTo(b.order);
-    });
-  for (final stroke in strokes) {
-    _drawStroke(canvas, stroke);
+    final strokes = controller.strokes
+        .where((stroke) => stroke.layerId == layer.id)
+        .toList()
+      ..sort((a, b) {
+        final layerOrder = a.layerCategory.index.compareTo(b.layerCategory.index);
+        return layerOrder != 0 ? layerOrder : a.order.compareTo(b.order);
+      });
+    for (final stroke in strokes) {
+      _drawStroke(canvas, stroke);
+    }
+    canvas.restore();
   }
 }
 
@@ -173,12 +181,8 @@ void _drawStroke(Canvas canvas, AdvancedStroke stroke) {
       final gradientBounds = path.getBounds();
       final left = gradientBounds.left;
       final top = gradientBounds.top;
-      final right = gradientBounds.width < 1
-          ? left + 1
-          : gradientBounds.right;
-      final bottom = gradientBounds.height < 1
-          ? top + 1
-          : gradientBounds.bottom;
+      final right = gradientBounds.width < 1 ? left + 1 : gradientBounds.right;
+      final bottom = gradientBounds.height < 1 ? top + 1 : gradientBounds.bottom;
       final shader = ui.Gradient.linear(
         Offset(left, top),
         Offset(right, bottom),
@@ -193,6 +197,71 @@ void _drawStroke(Canvas canvas, AdvancedStroke stroke) {
         const <double>[0, 0.2, 0.4, 0.6, 0.8, 1],
       );
       canvas.drawPath(path, basePaint..shader = shader);
+      break;
+    case StrokeStyle.watercolor:
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = stroke.width * 2.2
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..color = stroke.color.withAlpha((stroke.color.alpha * 0.18).round())
+          ..imageFilter = ui.ImageFilter.blur(sigmaX: 2.2, sigmaY: 2.2),
+      );
+      canvas.drawPath(
+        path,
+        basePaint..color = stroke.color.withAlpha((stroke.color.alpha * 0.55).round()),
+      );
+      break;
+    case StrokeStyle.calligraphy:
+      if (stroke.points.length > 1 &&
+          stroke.pressureSamples.length == stroke.points.length) {
+        for (var index = 1; index < stroke.points.length; index++) {
+          final pressure = stroke.pressureSamples[index];
+          final width = stroke.width * (0.45 + pressure * 1.55);
+          canvas.drawLine(
+            stroke.points[index - 1],
+            stroke.points[index],
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = width
+              ..strokeCap = StrokeCap.square
+              ..strokeJoin = StrokeJoin.bevel
+              ..color = stroke.color
+              ..isAntiAlias = true,
+          );
+        }
+      } else {
+        canvas.drawPath(
+          path,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = stroke.width * 1.35
+            ..strokeCap = StrokeCap.square
+            ..strokeJoin = StrokeJoin.bevel
+            ..color = stroke.color,
+        );
+      }
+      break;
+    case StrokeStyle.charcoal:
+      canvas.drawPath(
+        path,
+        basePaint..color = const Color(0xFF3E342E).withAlpha(199),
+      );
+      final random = math.Random(stroke.order + stroke.points.length);
+      final scatterPaint = Paint()
+          ..color = const Color(0xFF302820).withAlpha(61)
+          ..style = PaintingStyle.fill;
+      for (var index = 0; index < stroke.points.length; index += 2) {
+        final point = stroke.points[index];
+        final radius = math.max(0.5, stroke.width * 0.11);
+        for (var dot = 0; dot < 3; dot++) {
+          final dx = (random.nextDouble() - 0.5) * stroke.width * 1.7;
+          final dy = (random.nextDouble() - 0.5) * stroke.width * 1.7;
+          canvas.drawCircle(point + Offset(dx, dy), radius, scatterPaint);
+        }
+      }
       break;
   }
 }

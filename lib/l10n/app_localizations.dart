@@ -21,7 +21,7 @@ class AppLocalizations {
   static const Map<String, Map<String, String>> _localizedValues =
       <String, Map<String, String>>{
     'en': <String, String>{
-      'app_title': 'VibeSync Kids Drawing Toddler Paint',
+      'app_title': 'VibeSync Kids Drawing & Creative Studio Pro',
       'restoring_artwork': 'Restoring your last drawing…',
       'tool_brush': 'Magic Brush',
       'tool_bucket': 'Paint Bucket',
@@ -91,7 +91,7 @@ class AppLocalizations {
       'color_black': 'Black',
     },
     'es': <String, String>{
-      'app_title': 'VibeSync Dibujo Infantil',
+      'app_title': 'VibeSync Kids Drawing & Creative Studio Pro',
       'restoring_artwork': 'Restaurando tu último dibujo…',
       'tool_brush': 'Pincel mágico',
       'tool_bucket': 'Cubo de pintura',
@@ -161,7 +161,7 @@ class AppLocalizations {
       'color_black': 'Negro',
     },
     'hi': <String, String>{
-      'app_title': 'VibeSync बच्चों की ड्रॉइंग',
+      'app_title': 'VibeSync Kids Drawing & Creative Studio Pro',
       'restoring_artwork': 'आपका पिछला चित्र वापस लाया जा रहा है…',
       'tool_brush': 'जादुई ब्रश',
       'tool_bucket': 'रंग भरने की बाल्टी',
@@ -231,7 +231,7 @@ class AppLocalizations {
       'color_black': 'काला',
     },
     'zh': <String, String>{
-      'app_title': 'VibeSync 儿童绘画',
+      'app_title': 'VibeSync Kids Drawing & Creative Studio Pro',
       'restoring_artwork': '正在恢复上次的画作…',
       'tool_brush': '魔法画笔',
       'tool_bucket': '油漆桶',
@@ -301,7 +301,7 @@ class AppLocalizations {
       'color_black': '黑色',
     },
     'de': <String, String>{
-      'app_title': 'VibeSync Kinder-Malstudio',
+      'app_title': 'VibeSync Kids Drawing & Creative Studio Pro',
       'restoring_artwork': 'Deine letzte Zeichnung wird wiederhergestellt…',
       'tool_brush': 'Zauberpinsel',
       'tool_bucket': 'Farbeimer',
@@ -371,7 +371,7 @@ class AppLocalizations {
       'color_black': 'Schwarz',
     },
     'fr': <String, String>{
-      'app_title': 'VibeSync Dessin pour enfants',
+      'app_title': 'VibeSync Kids Drawing & Creative Studio Pro',
       'restoring_artwork': 'Restauration de votre dernier dessin…',
       'tool_brush': 'Pinceau magique',
       'tool_bucket': 'Pot de peinture',

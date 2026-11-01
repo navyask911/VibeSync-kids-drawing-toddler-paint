@@ -1,11 +1,11 @@
 name: kids_drawing_toddler_paint
-description: "VibeSync Kids Drawing Toddler Paint with child-directed AdMob settings"
+description: "VibeSync Kids Drawing & Creative Studio Pro by VibeSyncro Technologies Pvt Ltd"
 publish_to: "none"
-version: 1.0.6+20261025
+version: 1.0.7+20261026
 
 environment:
   sdk: ">=3.12.0 <4.0.0"
-  flutter: ">=3.24.0"
+  flutter: ">=3.44.0"
 
 dependencies:
   flutter:
@@ -19,9 +19,12 @@ dependencies:
   path_provider: ^2.1.5
   share_plus: ^10.1.4
   in_app_purchase: ^3.3.1
+  in_app_purchase_android: ^0.5.5
   file_picker: ^11.0.3
   pdf: ^3.13.1
   printing: ^5.15.1
+  image: ^4.12.0
+  flutter_tts: ^4.2.5
 
   # Google Mobile Ads official Flutter plugin
   google_mobile_ads: 9.2.0
