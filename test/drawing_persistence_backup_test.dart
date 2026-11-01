@@ -43,7 +43,7 @@ void main() {
       expect(controller.strokes, hasLength(1));
       expect(controller.strokes.single.points.last, const Offset(40, 52));
       expect(controller.strokes.single.color, const Color(0xFF9C27B0));
-      expect(controller.backgroundColor, Colors.lightBlue);
+      expect(controller.backgroundColor, const Color(0xFF03A9F4));
     });
 
     test('local autosave uses the same portable backup snapshot', () async {
