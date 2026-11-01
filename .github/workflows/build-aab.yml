@@ -74,7 +74,7 @@ jobs:
           # Static-site-only commits must not be forced to consume a new Play
           # version code. Release-relevant Flutter/Android changes still must
           # increase the code, and an explicitly requested release always does.
-          BUILD_INPUTS_CHANGED="$(git diff --name-only "$BASE_SHA" HEAD -- pubspec.yaml pubspec.lock lib android assets test)"
+          BUILD_INPUTS_CHANGED="$(git diff --name-only "$BASE_SHA" HEAD -- pubspec.yaml pubspec.lock lib android assets)"
           if [[ -z "$BUILD_INPUTS_CHANGED" && "$FORCE_RELEASE_VERSION_CHECK" != "true" ]]; then
             echo "No Flutter/Android build inputs changed; skipping only the version-code monotonicity check."
             exit 0

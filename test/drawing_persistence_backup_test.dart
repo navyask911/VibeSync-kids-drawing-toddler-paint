@@ -42,7 +42,7 @@ void main() {
       expect(restored, isTrue);
       expect(controller.strokes, hasLength(1));
       expect(controller.strokes.single.points.last, const Offset(40, 52));
-      expect(controller.strokes.single.color, Colors.purple);
+      expect(controller.strokes.single.color, const Color(0xFF9C27B0));
       expect(controller.backgroundColor, Colors.lightBlue);
     });
 
