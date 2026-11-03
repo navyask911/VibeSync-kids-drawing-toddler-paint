@@ -12,8 +12,8 @@ if (localPropertiesFile.exists()) {
     }
 }
 
-def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "20261027"
-def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.8"
+def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "20261103"
+def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.9"
 
 // -----------------------------------------------------------------------------
 // SECURE KEYSTORE SIGNATURE LOADING
@@ -51,8 +51,8 @@ android {
         // Google Play Billing 9.1.0 supports API 23+; Flutter's Android floor is API 24.
         minSdkVersion 24
         targetSdkVersion 36
-        versionCode 20261027
-        versionName "1.0.8"
+        versionCode 20261103
+        versionName "1.0.9"
         multiDexEnabled true
     }
 

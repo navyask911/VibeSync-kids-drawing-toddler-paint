@@ -600,34 +600,49 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                const Text('VibeSync Ad-Free — yearly subscription',
+                const Text('Plan: ₹299 / Year (Ad-Free + Pro Creative Studio)',
                     style: TextStyle(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 5),
                 Text(_subscription.isAdFree
-                    ? 'Ad-free access is active on this device.'
-                    : '$price · One year · Auto-renews unless canceled in Google Play.'),
+                    ? 'Your device-bound subscription is active.'
+                    : 'Google Play price: $price · Auto-renews unless canceled in Google Play.'),
+                const SizedBox(height: 6),
+                const Text(
+                  'Protection: Protected against app updates & reinstalls on this device.',
+                  style: TextStyle(fontSize: 12),
+                ),
+                const SizedBox(height: 3),
+                const Text(
+                  'Device Policy: Valid for 1 device only (bound to this device).',
+                  style: TextStyle(fontSize: 12),
+                ),
                 const SizedBox(height: 8),
                 if (!_subscription.isAdFree)
                   FilledButton.icon(
-                    onPressed: _subscription.product == null || _subscription.isPurchasing
+                    onPressed: _subscription.product == null ||
+                            _subscription.isPurchasing ||
+                            !_subscription.deviceBindingReady ||
+                            _subscription.isBoundElsewhere
                         ? null
                         : _purchaseAdFreeSubscription,
                     icon: const Icon(Icons.workspace_premium),
                     label: Text(_subscription.isPurchasing
                         ? 'Waiting for Google Play…'
-                        : 'Subscribe / unlock premium'),
+                        : 'Subscribe for ₹299 / Year'),
                   ),
                 Wrap(
                   spacing: 6,
                   runSpacing: 4,
                   children: <Widget>[
                     TextButton(
-                      onPressed: _subscription.isRestoring ? null : _restoreAdFreeSubscription,
-                      child: const Text('Restore purchases'),
+                      onPressed: _subscription.isRestoring || !_subscription.deviceBindingReady
+                          ? null
+                          : _restoreAdFreeSubscription,
+                      child: const Text('Restore on This Device'),
                     ),
                     TextButton(
                       onPressed: _manageSubscription,
-                      child: const Text('Manage subscription'),
+                      child: const Text('Manage Subscription'),
                     ),
                   ],
                 ),
@@ -727,10 +742,13 @@ class _DrawingStudioScreenState extends State<DrawingStudioScreen>
         icon: const Icon(Icons.workspace_premium, size: 34),
         title: const Text('Unlock VibeSync Premium'),
         content: Text(
-          '$price for one year, billed and managed by Google Play. '
-          'Unlock ad-free drawing, neon and rainbow brushes, extra colors and templates, '
-          'PDF export, and parent-controlled artwork backup. '
-          'The final price and renewal details are shown by Google Play before purchase.',
+          'Plan: ₹299 / Year (Ad-Free + Pro Creative Studio). '
+          'Google Play price: $price. '
+          'Protection: Protected against app updates & reinstalls on this device. '
+          'Device Policy: Valid for 1 device only (bound to this device). '
+          'Includes ad-free drawing, premium brushes, extra colors and templates, '
+          'PDF export and parent-controlled artwork backup. '
+          'The final price, renewal terms and cancellation details are shown by Google Play.',
         ),
         actions: <Widget>[
           TextButton(

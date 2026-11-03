@@ -38,7 +38,13 @@ adfree_yearly
 
 Create and activate this subscription in Play Console, add an annual auto-renewing base plan, and set the India price to **₹299 per year** (or the intended localized price in other markets). Google Play owns the displayed price, offer eligibility, billing periods and renewal terms; the app intentionally displays the price returned by the store rather than hard-coding it.
 
-The current app entitlement is based on the Google Play purchase stream/restore response with a 24-hour app-private cache for offline startup. **There is no server-side purchase-token verification service in this repository.** The local cache is convenience state, not tamper-resistant proof: before relying on subscriptions for cross-device access, refunds, chargebacks, revocations or high-value entitlements, add a secure backend that verifies Play purchase tokens and checks subscription expiry and acknowledgement. Never treat a client-only cache as the billing authority.
+Android purchases use Google Play Billing subscriptions (not consumable purchases) through `in_app_purchase` and `in_app_purchase_android`. The product ID is `adfree_yearly` and must be configured in Play Console as an active auto-renewing subscription with the intended ₹299 annual base plan. Purchases use `buyNonConsumable`; every update marked `pendingCompletePurchase` is acknowledged with `completePurchase`.
+
+For device binding, Android reads `Settings.Secure.ANDROID_ID` through a native Flutter platform channel and computes a SHA-256 hash using the app package name as a salt. Only that 64-character hash is sent to Google Play as the obfuscated account ID. A purchase/restore is granted only when the returned Google Play `obfuscatedAccountId` matches the current device hash. A legacy/test purchase with no obfuscated ID may be bound locally on first activation; it cannot be proven to belong to the first device after app data is removed, so this fallback is weaker than a Play record created with device binding.
+
+The app stores the matching device hash and latest successful store confirmation in SharedPreferences for a **7-day offline grace period**. The cache is convenience state, not authoritative subscription proof, and is ignored when its device hash differs. On Android 8.0+, `ANDROID_ID` is scoped to the app signing key, Android user/profile and device; it remains stable across app updates and uninstall/reinstall while those scopes remain unchanged, but can change after a factory reset, signing-key change or user/profile change.
+
+**There is no server-side purchase-token verification or central device-claim service in this repository.** Client-side binding blocks ordinary Google Play restores on a second device when the purchase contains its obfuscated account ID, but a modified client, identity change, or legacy purchase without a Play-side ID can bypass or weaken the limit. Enforceable cross-device controls, expiry/refund/revocation checks and abuse response require a trusted backend that verifies Play purchase tokens and atomically binds each active token to one device hash. This implementation does not claim server-grade anti-sharing or tamper resistance.
 
 ## Data handling and child safety
 
@@ -75,10 +81,10 @@ GitHub Actions performs dependency resolution, launcher generation, Flutter test
 
 ## Release version
 
-Current candidate: **1.0.8 (versionCode 20261027)**, represented by:
+Current candidate: **1.0.9 (versionCode 20261103)**, represented by:
 
 ```yaml
-version: 1.0.8+20261027
+version: 1.0.9+20261103
 ```
 
 The same values must be reflected in `android/app/build.gradle`. Verify the version code has not already been used in Play Console before uploading.

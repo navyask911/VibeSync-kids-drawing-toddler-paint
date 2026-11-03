@@ -19,7 +19,7 @@
   <h1>Privacy Notice</h1>
   <p class="meta"><strong>VibeSync Kids Drawing &amp; Creative Studio Pro</strong><br>
   Publisher: VibeSyncro Technologies Pvt Ltd<br>
-  Last reviewed: November 1, 2026</p>
+  Last reviewed: November 3, 2026</p>
 
   <p>This notice describes the current app implementation. It is not legal advice or a certification of compliance. Parents and guardians should review the Play Store disclosures, Data safety form, third-party provider terms and this notice before use.</p>
 
@@ -34,7 +34,9 @@
 
   <h2>Advertising, billing and other providers</h2>
   <p>The app integrates Google Mobile Ads, Google Play Billing, connectivity checks, in-app updates, file selection, PDF/printing, image encoding and text-to-speech libraries. Ad requests set child-directed treatment, a G-rated content ceiling and a non-personalized request extra. These code settings do not certify SDK/mediation eligibility or prove compliance with Google Play Families, COPPA, GDPR or other laws. Verify the active SDK certification status, disclosures, regional consent requirements and Play Console declarations before release.</p>
-  <p>Google Play processes purchases and may receive transaction, account, device and diagnostic information under its own policies. The app persists a 24-hour on-device entitlement cache for offline convenience, but this repository does not include server-side purchase-token validation. The cache is not authoritative proof of expiry, refund, revocation, chargeback or cross-device ownership.</p>
+  <p>Google Play processes purchases and may receive transaction, account, device and diagnostic information under its own policies. For Android's one-device subscription policy, the app reads <code>Settings.Secure.ANDROID_ID</code> locally through a native platform channel and computes a SHA-256 digest salted with the app package name (<code>com.navya.kids_drawing_studio</code>). The raw Android ID is not sent to the publisher's server; the digest is passed to Google Play Billing as the obfuscated account ID for <code>adfree_yearly</code>. Google Play stores that value with the purchase and returns it in Android purchase records so the app can compare it with the current device.</p>
+  <p>A successful device-matched subscription confirmation and the 64-character binding hash are cached in SharedPreferences for up to <strong>7 days</strong> for offline startup. A cache is ignored when its stored hash does not match the current device. Android documents ANDROID_ID as scoped to app signing key, Android user/profile and device on Android 8.0+ and stable across uninstall/reinstall while those scopes remain unchanged. A factory reset, signing-key change or different Android user/profile may produce a different identifier.</p>
+  <p>A legacy/test purchase with no Play obfuscated account ID may be bound locally on first activation. Without a Play-side identifier or server-side record, that fallback cannot prove which device first claimed it after app data is removed. This repository has no server-side purchase-token verification or central device-claim service. Client-side binding is not tamper-resistant proof and cannot guarantee enforcement against a modified client, identity changes, expiry, refunds, chargebacks or revocation; stronger enforcement requires a trusted backend.</p>
   <p>Connectivity and update APIs may contact their providers' network endpoints. This repository does not operate a backend receiving these checks.</p>
 
   <h2>Permissions</h2>

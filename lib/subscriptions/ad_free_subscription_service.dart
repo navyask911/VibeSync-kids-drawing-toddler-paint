@@ -1,66 +1,130 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'device_binding.dart';
+
+typedef DeviceBindingHashLoader = Future<String> Function();
 
 class AdFreeSubscriptionService extends ChangeNotifier {
-  AdFreeSubscriptionService({InAppPurchase? store})
-      : _store = store ?? InAppPurchase.instance;
+  AdFreeSubscriptionService({
+    InAppPurchase? store,
+    SharedPreferencesAsync? preferences,
+    DeviceBindingHashLoader? deviceBindingHashLoader,
+  })  : _store = store ?? InAppPurchase.instance,
+        _preferences = preferences ?? SharedPreferencesAsync(),
+        _deviceBindingHashLoader =
+            deviceBindingHashLoader ?? DeviceBinding.currentDeviceBindingHash;
 
   static const String productId = 'adfree_yearly';
-  static const Duration cacheValidity = Duration(hours: 24);
-  static const int _maxCacheBytes = 4096;
+  static const Duration cacheValidity = Duration(days: 7);
+  static const String differentDeviceMessage =
+      'This ₹299/year subscription is already active on another device. '
+      'Our subscription is strictly valid for 1 device only.';
+
+  static const String _cachePrefix = 'adfree_yearly.';
+  static const String _activeKey = '${_cachePrefix}active';
+  static const String _confirmedAtKey = '${_cachePrefix}confirmed_at';
+  static const String _deviceHashKey = '${_cachePrefix}device_binding_hash';
+  static const String _bindingSourceKey = '${_cachePrefix}binding_source';
 
   final InAppPurchase _store;
+  final SharedPreferencesAsync _preferences;
+  final DeviceBindingHashLoader _deviceBindingHashLoader;
+
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
+  Future<void> _purchaseUpdateQueue = Future<void>.value();
+
   ProductDetails? product;
+  String? deviceBindingHash;
   bool storeAvailable = false;
   bool isReady = false;
   bool isAdFree = false;
   bool isPurchasing = false;
   bool isRestoring = false;
+  bool isBoundElsewhere = false;
+  bool isUsingOfflineGrace = false;
   String? message;
-  bool _foundSubscriptionDuringRestore = false;
+
+  bool get deviceBindingReady => deviceBindingHash != null;
 
   static bool isCacheValid({
     required bool active,
     required DateTime? confirmedAt,
+    required String? cachedDeviceBindingHash,
+    required String? currentDeviceBindingHash,
     DateTime? now,
   }) {
-    if (!active || confirmedAt == null) return false;
+    if (!active ||
+        confirmedAt == null ||
+        cachedDeviceBindingHash == null ||
+        currentDeviceBindingHash == null ||
+        cachedDeviceBindingHash.isEmpty ||
+        currentDeviceBindingHash.isEmpty ||
+        cachedDeviceBindingHash != currentDeviceBindingHash) {
+      return false;
+    }
     final age = (now ?? DateTime.now()).toUtc().difference(confirmedAt.toUtc());
     return !age.isNegative && age <= cacheValidity;
   }
 
-  Future<File> _cacheFile() async {
-    final dir = await getApplicationSupportDirectory();
-    return File('${dir.path}${Platform.pathSeparator}ad_free_subscription_v1.json');
+  Future<bool> _refreshDeviceBinding() async {
+    try {
+      final currentHash = await _deviceBindingHashLoader();
+      if (currentHash.length != 64) {
+        throw StateError('The device binding hash is invalid.');
+      }
+      deviceBindingHash = currentHash;
+      await _loadCachedEntitlement();
+      return true;
+    } catch (error) {
+      deviceBindingHash = null;
+      isAdFree = false;
+      isUsingOfflineGrace = false;
+      message = Platform.isAndroid
+          ? 'Could not identify this device for subscription protection. '
+              'Purchases and restores are disabled.'
+          : 'Per-device Google Play subscriptions are supported on Android only.';
+      debugPrint('Device binding refresh failed: $error');
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> initialize() async {
-    await _loadCachedEntitlement();
+    // Resolve the binding before accepting purchase callbacks, but subscribe
+    // before querying Play so unfinished transactions are not missed.
+    await _refreshDeviceBinding();
     _purchaseSubscription ??= _store.purchaseStream.listen(
-      _handlePurchaseUpdates,
+      _enqueuePurchaseUpdates,
       onError: (Object error, StackTrace stackTrace) {
         message = 'Google Play purchase updates are temporarily unavailable.';
         debugPrint('Purchase stream error: $error');
         notifyListeners();
       },
     );
+
     try {
-      storeAvailable = await _store.isAvailable().timeout(const Duration(seconds: 8));
+      storeAvailable =
+          await _store.isAvailable().timeout(const Duration(seconds: 8));
       if (storeAvailable) {
         await refreshProductDetails();
-        await restorePurchases();
+        if (deviceBindingReady) {
+          await restorePurchases();
+        }
+      } else if (isAdFree) {
+        message = 'Your device-bound subscription is available in offline grace mode.';
       } else {
         message = 'Google Play is not available on this device right now.';
       }
     } catch (error) {
-      message = 'Could not refresh the subscription with Google Play.';
+      message = isAdFree
+          ? 'Your device-bound subscription is available in offline grace mode.'
+          : 'Could not refresh the subscription with Google Play.';
       debugPrint('Subscription initialization deferred: $error');
     } finally {
       isReady = true;
@@ -69,62 +133,78 @@ class AdFreeSubscriptionService extends ChangeNotifier {
   }
 
   Future<void> _loadCachedEntitlement() async {
-    try {
-      final file = await _cacheFile();
-      if (!await file.exists()) return;
-      final length = await file.length();
-      if (length <= 0 || length > _maxCacheBytes) {
-        await file.delete();
-        return;
-      }
-      final json = jsonDecode(await file.readAsString());
-      if (json is! Map<String, dynamic>) return;
-      final timestamp = json['confirmedAt'];
-      isAdFree = isCacheValid(
-        active: json['active'] == true,
-        confirmedAt: timestamp is String ? DateTime.tryParse(timestamp) : null,
-      );
-    } catch (error) {
-      debugPrint('Ad-free cache read failed: $error');
-      isAdFree = false;
+    final active = await _preferences.getBool(_activeKey) ?? false;
+    final storedHash = await _preferences.getString(_deviceHashKey);
+    final confirmedAtValue = await _preferences.getString(_confirmedAtKey);
+    final confirmedAt = confirmedAtValue == null
+        ? null
+        : DateTime.tryParse(confirmedAtValue);
+
+    isBoundElsewhere = false;
+    isAdFree = isCacheValid(
+      active: active,
+      confirmedAt: confirmedAt,
+      cachedDeviceBindingHash: storedHash,
+      currentDeviceBindingHash: deviceBindingHash,
+    );
+    isUsingOfflineGrace = isAdFree;
+
+    if (active &&
+        storedHash != null &&
+        deviceBindingHash != null &&
+        storedHash != deviceBindingHash) {
+      isBoundElsewhere = true;
+      message = differentDeviceMessage;
+    } else if (active && !isAdFree) {
+      await _clearCachedEntitlement();
     }
   }
 
-  Future<void> _persistEntitlement() async {
-    final file = await _cacheFile();
-    await file.parent.create(recursive: true);
-    await file.writeAsString(
-      jsonEncode(<String, Object?>{
-        'version': 1,
-        'active': true,
-        'confirmedAt': DateTime.now().toUtc().toIso8601String(),
-      }),
-      flush: true,
+  Future<void> _persistEntitlement({required String bindingSource}) async {
+    final hash = deviceBindingHash;
+    if (hash == null) {
+      throw StateError('Cannot cache entitlement without a device binding.');
+    }
+    await _preferences.setBool(_activeKey, true);
+    await _preferences.setString(
+      _confirmedAtKey,
+      DateTime.now().toUtc().toIso8601String(),
     );
+    await _preferences.setString(_deviceHashKey, hash);
+    await _preferences.setString(_bindingSourceKey, bindingSource);
   }
 
-  Future<void> _clearCachedEntitlement() async {
+  Future<void> _clearCachedEntitlement({bool preserveDeviceBinding = false}) async {
     try {
-      final file = await _cacheFile();
-      if (await file.exists()) await file.delete();
+      await _preferences.remove(_activeKey);
+      await _preferences.remove(_confirmedAtKey);
+      if (!preserveDeviceBinding) {
+        await _preferences.remove(_deviceHashKey);
+        await _preferences.remove(_bindingSourceKey);
+      }
     } catch (error) {
       debugPrint('Ad-free cache clear failed: $error');
     }
   }
 
-  Future<void> _grantEntitlement() async {
+  Future<void> _grantEntitlement({required String bindingSource}) async {
     isAdFree = true;
+    isBoundElsewhere = false;
+    isUsingOfflineGrace = false;
     try {
-      await _persistEntitlement();
+      await _persistEntitlement(bindingSource: bindingSource);
     } catch (error) {
       debugPrint('Ad-free cache write failed: $error');
     }
     notifyListeners();
   }
 
-  Future<void> _revokeEntitlement() async {
+  Future<void> _blockDifferentDevice() async {
     isAdFree = false;
-    await _clearCachedEntitlement();
+    isUsingOfflineGrace = false;
+    isBoundElsewhere = true;
+    await _clearCachedEntitlement(preserveDeviceBinding: true);
+    message = differentDeviceMessage;
     notifyListeners();
   }
 
@@ -140,8 +220,6 @@ class AdFreeSubscriptionService extends ChangeNotifier {
       for (final details in response.productDetails) {
         if (details.id != productId) continue;
         firstMatch ??= details;
-        // Google Play returns a detail for each eligible subscription offer.
-        // Prefer a result with a usable base-plan offer token.
         if (details is GooglePlayProductDetails &&
             details.offerToken != null &&
             details.offerToken!.isNotEmpty) {
@@ -161,7 +239,20 @@ class AdFreeSubscriptionService extends ChangeNotifier {
   }
 
   Future<void> purchase() async {
+    if (!await _refreshDeviceBinding()) return;
     final details = product;
+    final bindingHash = deviceBindingHash;
+    if (bindingHash == null) {
+      message = 'This Android device could not be securely identified. '
+          'Subscription purchase is disabled.';
+      notifyListeners();
+      return;
+    }
+    if (isBoundElsewhere) {
+      message = differentDeviceMessage;
+      notifyListeners();
+      return;
+    }
     if (!storeAvailable || details == null || isPurchasing) {
       message = details == null
           ? 'The subscription is not currently available in Google Play.'
@@ -169,30 +260,23 @@ class AdFreeSubscriptionService extends ChangeNotifier {
       notifyListeners();
       return;
     }
+
     isPurchasing = true;
     message = null;
     notifyListeners();
     try {
-      final PurchaseParam purchaseParam;
-      if (Platform.isAndroid) {
-        if (details is! GooglePlayProductDetails ||
-            details.offerToken == null ||
-            details.offerToken!.isEmpty) {
-          isPurchasing = false;
-          message = 'Google Play did not return an eligible subscription offer. Check the active base plan in Play Console.';
-          notifyListeners();
-          return;
-        }
-        purchaseParam = GooglePlayPurchaseParam(
-          productDetails: details,
-          offerToken: details.offerToken,
-        );
-      } else {
-        purchaseParam = PurchaseParam(productDetails: details);
+      if (!Platform.isAndroid ||
+          details is! GooglePlayProductDetails ||
+          details.offerToken == null ||
+          details.offerToken!.isEmpty) {
+        throw StateError('Google Play did not return an eligible Android subscription offer.');
       }
-      final started = await _store.buyNonConsumable(
-        purchaseParam: purchaseParam,
+      final purchaseParam = GooglePlayPurchaseParam(
+        productDetails: details,
+        applicationUserName: bindingHash,
+        offerToken: details.offerToken,
       );
+      final started = await _store.buyNonConsumable(purchaseParam: purchaseParam);
       if (!started) {
         isPurchasing = false;
         message = 'Google Play could not start the purchase.';
@@ -208,22 +292,43 @@ class AdFreeSubscriptionService extends ChangeNotifier {
 
   Future<void> restorePurchases() async {
     if (!storeAvailable || isRestoring) return;
+    if (!await _refreshDeviceBinding()) return;
+    if (!deviceBindingReady) {
+      message = 'This Android device could not be securely identified. '
+          'Subscription restoration is disabled.';
+      notifyListeners();
+      return;
+    }
+
     isRestoring = true;
-    _foundSubscriptionDuringRestore = false;
+    _restoreSawSubscription = false;
+    _restoreFoundEntitlement = false;
+    _restoreFoundMismatch = false;
     message = null;
     notifyListeners();
     try {
       await _store.restorePurchases().timeout(const Duration(seconds: 8));
-      await Future<void>.delayed(const Duration(milliseconds: 900));
-      if (!_foundSubscriptionDuringRestore) {
-        await _revokeEntitlement();
-        message = 'No active ad-free subscription was found for this Play account.';
+      await _purchaseUpdateQueue.timeout(const Duration(seconds: 8));
+
+      if (_restoreFoundMismatch) {
+        await _blockDifferentDevice();
+      } else if (_restoreFoundEntitlement) {
+        message = 'Your subscription has been restored on this device.';
+      } else if (_restoreSawSubscription) {
+        message = 'Google Play returned a subscription record that could not '
+            'be verified for this device.';
       } else {
-        message = 'Your ad-free subscription has been restored.';
+        await _clearCachedEntitlement();
+        isAdFree = false;
+        isUsingOfflineGrace = false;
+        isBoundElsewhere = false;
+        message = 'No active adfree_yearly subscription was found for this Play account.';
       }
     } catch (error) {
-      // A store outage must not erase a still-fresh cached state.
-      message = 'Could not restore purchases. Please try again when online.';
+      message = isAdFree
+          ? 'Google Play could not refresh your subscription. '
+              'Your device-bound offline grace remains active.'
+          : 'Could not restore purchases. Please try again when online.';
       debugPrint('Restore failed: $error');
     } finally {
       isRestoring = false;
@@ -231,53 +336,102 @@ class AdFreeSubscriptionService extends ChangeNotifier {
     }
   }
 
-  void _handlePurchaseUpdates(List<PurchaseDetails> updates) {
-    for (final purchase in updates) {
-      unawaited(_handlePurchase(purchase));
-    }
+  bool _restoreSawSubscription = false;
+  bool _restoreFoundEntitlement = false;
+  bool _restoreFoundMismatch = false;
+
+  void _enqueuePurchaseUpdates(List<PurchaseDetails> updates) {
+    _purchaseUpdateQueue = _purchaseUpdateQueue
+        .then<void>((_) async {
+          for (final purchase in updates) {
+            await _handlePurchase(purchase);
+          }
+        })
+        .catchError((Object error, StackTrace stackTrace) {
+          debugPrint('Purchase update processing failed: $error');
+        });
   }
 
   Future<void> _handlePurchase(PurchaseDetails purchase) async {
-    if (purchase.productID == productId) {
+    try {
+      if (purchase.productID != productId) return;
       switch (purchase.status) {
         case PurchaseStatus.pending:
           isPurchasing = true;
-          message = 'Google Play is processing your purchase.';
+          message = 'Google Play is processing your subscription purchase.';
           notifyListeners();
           break;
         case PurchaseStatus.purchased:
         case PurchaseStatus.restored:
-          // The store plugin reports a completed transaction. The cache is
-          // only an offline convenience; receipt/token verification on a
-          // trusted server is needed for strong expiry/refund protection.
-          if (purchase.verificationData.serverVerificationData.isNotEmpty) {
-            _foundSubscriptionDuringRestore = true;
-            await _grantEntitlement();
-            isPurchasing = false;
-            message = 'Ad-free access is active on this device.';
-          } else {
+          _restoreSawSubscription = true;
+          if (purchase.verificationData.serverVerificationData.isEmpty) {
             isPurchasing = false;
             message = 'Google Play did not provide purchase details to confirm access.';
+            notifyListeners();
+            break;
           }
+          if (!Platform.isAndroid || deviceBindingHash == null) {
+            isPurchasing = false;
+            message = 'Per-device Google Play subscriptions are supported on Android only.';
+            notifyListeners();
+            break;
+          }
+          if (purchase is! GooglePlayPurchaseDetails) {
+            isPurchasing = false;
+            message = 'Google Play returned an unsupported purchase record. Access was not activated.';
+            notifyListeners();
+            break;
+          }
+
+          final previousBinding = await _preferences.getString(_deviceHashKey);
+          final decision = DeviceBinding.evaluatePurchase(
+            currentDeviceBindingHash: deviceBindingHash!,
+            obfuscatedAccountId: purchase.billingClientPurchase.obfuscatedAccountId,
+            previouslyBoundDeviceHash: previousBinding,
+          );
+          if (decision == PurchaseDeviceBindingDecision.differentDevice) {
+            _restoreFoundMismatch = true;
+            isPurchasing = false;
+            await _blockDifferentDevice();
+            break;
+          }
+
+          final source = decision == PurchaseDeviceBindingDecision.legacyFirstActivation
+              ? 'legacy-first-activation'
+              : 'google-play-obfuscated-account-id';
+          await _grantEntitlement(bindingSource: source);
+          _restoreFoundEntitlement = true;
+          isPurchasing = false;
+          message = 'Ad-free and Pro Creative Studio are active on this device.';
           notifyListeners();
           break;
         case PurchaseStatus.error:
           isPurchasing = false;
-          message = purchase.error?.message ?? 'The purchase could not be completed.';
+          message = purchase.error?.message ?? 'The subscription purchase could not be completed.';
           notifyListeners();
           break;
         case PurchaseStatus.canceled:
           isPurchasing = false;
-          message = 'The purchase was canceled.';
+          message = 'The subscription purchase was canceled.';
           notifyListeners();
           break;
       }
-    }
-    if (purchase.pendingCompletePurchase) {
-      try {
-        await _store.completePurchase(purchase);
-      } catch (error) {
-        debugPrint('Purchase completion failed: $error');
+    } catch (error, stackTrace) {
+      debugPrint('Purchase update handling failed: $error\n$stackTrace');
+      if (purchase.productID == productId) {
+        isPurchasing = false;
+        message = 'The subscription update could not be processed. Please restore again from the parent area.';
+        notifyListeners();
+      }
+    } finally {
+      // Acknowledge even a rejected cross-device record; acknowledge within
+      // Google's three-day Android deadline so the purchase is not refunded.
+      if (purchase.pendingCompletePurchase) {
+        try {
+          await _store.completePurchase(purchase);
+        } catch (error) {
+          debugPrint('Purchase completion/acknowledgement failed: $error');
+        }
       }
     }
   }

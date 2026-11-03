@@ -3,7 +3,7 @@
 **App:** VibeSync Kids Drawing & Creative Studio Pro  
 **Publisher:** VibeSyncro Technologies Pvt Ltd  
 **Website:** https://vibesyncro.com/  
-**Last reviewed:** November 1, 2026
+**Last reviewed:** November 3, 2026
 
 This notice describes the current repository implementation. It is not legal advice, a certification of compliance, or a substitute for the privacy disclosures and declarations required by Google Play, advertising providers, or applicable law.
 
@@ -33,7 +33,11 @@ The Android application integrates Google Mobile Ads, Google Play Billing throug
 
 The AdMob helper applies child-directed treatment, a G-rated content ceiling and a non-personalized request extra. These settings do not by themselves establish that every serving ad SDK/mediation adapter is currently certified for children or that every legal requirement has been met. Before release, verify the currently applicable Google Play Families Policy requirements, SDK self-certification status, ad mediation partners, privacy settings, regional consent requirements, Data safety answers and ad disclosures.
 
-Google Play processes purchases and may receive purchase-account, transaction, device and diagnostic data under its own policies. The current app receives purchase updates/restores and persists a 24-hour app-private entitlement cache for offline convenience. This repository does not include server-side purchase-token validation. The local cache is not authoritative proof of subscription validity, expiry, refunds, chargebacks or cross-device ownership.
+Google Play processes purchases and may receive purchase-account, transaction, device and diagnostic data under its own policies. For Android's one-device subscription policy, the app reads `Settings.Secure.ANDROID_ID` locally through a native platform channel and computes a SHA-256 digest salted with the app package name (`com.navya.kids_drawing_studio`). The raw Android ID is not sent to the publisher's server; the digest is passed to Google Play Billing as the obfuscated account ID for `adfree_yearly`. Google Play stores that value with the purchase and returns it in Android purchase records so the app can compare it with the current device.
+
+The app caches a successful device-matched subscription confirmation and the 64-character binding hash in SharedPreferences for up to **7 days** to support offline startup. A cache is ignored when the stored hash does not match the current device. Android documents ANDROID_ID as scoped to app signing key, Android user/profile and device on Android 8.0+ and stable across uninstall/reinstall while those scopes remain unchanged. A factory reset, changed signing key or different Android user/profile may produce a different identifier.
+
+A legacy/test purchase with no obfuscated account ID may be bound locally on first activation. Without a Play-side identifier or server-side record, that legacy fallback cannot prove which physical device first claimed it after app data is removed. This repository has no server-side purchase-token validation or central device-claim service. Local binding and the 7-day cache are not tamper-resistant proof and cannot guarantee enforcement against a modified client, device identity changes, expiry, refunds, chargebacks or revocation. Stronger enforcement requires a trusted backend.
 
 Connectivity and update APIs may contact their respective network endpoints. The app does not operate a server receiving these checks.
 
